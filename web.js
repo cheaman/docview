@@ -103,7 +103,9 @@
     pickFile: () => {
       const i = document.createElement('input');
       i.type = 'file';
-      i.accept = '.pdf,.hwp,.hwpx,.doc,.docx,.txt,.xls,.xlsx,.html,.htm,.dxf,.dwg,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,application/pdf,image/*,text/plain';
+      // 아이폰 파일 고르기는 애플이 모르는 확장자(.hwp · .dxf 등)를 흐리게 막음 → 아이폰은 제한 없이 (못 여는 형식은 앱이 알림)
+      if (!/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document))
+        i.accept = '.pdf,.hwp,.hwpx,.doc,.docx,.txt,.xls,.xlsx,.html,.htm,.dxf,.dwg,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,application/pdf,image/*,text/plain';
       i.onchange = async () => {
         const f = i.files?.[0]; if (!f) return;
         try { 대기 = JSON.stringify({ id: await 받기(f) }); }
