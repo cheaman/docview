@@ -193,7 +193,8 @@ function 그림열기(d) {
     pg.remove();
     알림(바꿈 && !폰 && !웹 ? '<b>HEIC 는 폰에서만 열림</b><div class="sm">PC 시험 화면</div>' : '<b>그림을 못 그림 · 파일이 깨졌을 수 있음</b>');
   };
-  img.src = 주소;
+  if (웹) fetch(주소).then(r => (r.ok ? r.blob() : Promise.reject())).then(b => (img.src = URL.createObjectURL(b)), () => img.onerror());   // 아이폰 웹앱 — 보관함에서 꺼내 blob 으로 (목록으로 갈 때 놓음)
+  else img.src = 주소;
   $('#vsub').textContent = '그림';
 }
 // ③-4 도면 (DXF) — 읽기 · 모으기 · 목록은 dxf.js · 화면은 캔버스 하나

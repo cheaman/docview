@@ -28,6 +28,16 @@
   const 파일꺼내기 = id => 일('readonly', s => s.get(id));
   const 파일빼기 = id => 일('readwrite', s => s.delete(id)).catch(() => {});
   navigator.storage?.persist?.();                      // 사파리가 오래 안 쓴 보관함을 지우지 않게 부탁
+  // doc/<id> 는 일꾼을 거치지 않고 여기서 보관함으로 바로 — 처음 연 날은 일꾼이 아직 자리를 안 잡아 「원본 없음」 이 났음 (10-03 실측)
+  const 원래fetch = window.fetch.bind(window);
+  window.fetch = async (u, o) => {
+    const 주소 = new URL(typeof u === 'string' ? u : u?.url || '', location.href);
+    const m = 주소.origin === location.origin && /\/doc\/([^/?#]+)$/.exec(주소.pathname);
+    if (!m) return 원래fetch(u, o);
+    const 것 = await 파일꺼내기(decodeURIComponent(m[1])).catch(() => null);
+    if (!것) return new Response('{"error":"원본 없음"}', { status: 404, headers: { 'Content-Type': 'application/json' } });
+    return new Response(것.blob, { headers: { 'Content-Type': 것.type || 'application/octet-stream' } });
+  };
 
   const 목록 = () => 읽기('docview-recent', []);
   const 목록쓰기 = a => 쓰기('docview-recent', a);
