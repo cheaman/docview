@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>영상 → 클로드</title>
+<!-- 36번 화면캡처 · v0.1 (2026-10-04) — 영상을 장면판 그림 + 글로 바꿔 클로드에게, 클로드 답은 내용 문서로
+     PC 크롬에서 먼저 시험하는 화면. 34번 문서보기 「영상」 칸으로 옮겨 갈 것.
+     글꼴 : 시험 화면만 인터넷(jsdelivr)에서 받음 — 앱에 넣을 때는 글꼴 파일을 묶어 넣는다 (인터넷 권한 없음) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="영상.css">
+</head><body>
+<div class="앱">
+ <div class="머리"><span class="표식">DSM<i><u></u><u></u><u></u><u></u></i></span><h1>영상 → 클로드</h1></div>
+ <div class="단계" id="단계"><span data-n="1">1 가져오기</span><span data-n="2">2 자르기</span><span data-n="3">3 장면 고르기</span><span data-n="4">4 내용 문서</span></div>
+
+ <!-- 1 가져오기 -->
+ <section class="칸" id="칸1">
+  <div class="이름">1 · 영상 가져오기</div>
+  <label class="놓는곳" id="놓는곳">녹화한 영상을 고르거나 여기에 끌어 놓기<br><small>→ 갤럭시 「화면 녹화」 · 아이폰 「화면 기록」 영상</small>
+   <input type="file" id="파일" accept="video/*" hidden></label>
+  <button class="보조" id="문서만">클로드 답만 붙여 넣기 → 4 내용 문서</button>
+ </section>
+
+ <!-- 2 자르기 · 물을 말 -->
+ <section class="칸" id="칸2" hidden>
+  <div class="이름">2 · 쓸 부분 · 물을 말</div>
+  <video id="영상" controls playsinline muted></video>
+  <div class="자르기"><div class="띠"></div><div class="쓸" id="쓸"></div>
+   <input type="range" id="시작" min="0" max="1000" value="0"><input type="range" id="끝" min="0" max="1000" value="1000"></div>
+  <div class="시각들"><span id="시작글">0:00</span><span id="길이글">쓸 부분 0:00</span><span id="끝글">0:00</span></div>
+  <div class="줄"><button class="보조 넓" id="여기시작">▶ 지금 자리부터</button><button class="보조 넓" id="여기끝">지금 자리까지 ■</button></div>
+  <div class="줄"><button class="보조 넓" id="손으로">📷 지금 장면 꼭 넣기</button><span class="풀이" id="손수"></span></div>
+  <div class="이름">장면 뽑기</div>
+  <div class="칩들" id="방식"><button class="칩 켬" data-v="바뀔때">장면 바뀔 때</button><button class="칩" data-v="2초">2초마다</button></div>
+  <div class="이름">클로드에게 물을 말</div>
+  <div class="칩들" id="물음칩">
+   <button class="칩 켬" data-v="이 영상의 재료와 조리 순서를 표로 정리해 줘">레시피 정리</button>
+   <button class="칩" data-v="이 영상의 요점을 세 줄로 정리해 줘">요점 3줄</button>
+   <button class="칩" data-v="이 영상에 나온 장소 · 가게 이름 · 특징을 표로 정리해 줘">장소 · 가게</button>
+   <button class="칩" data-v="">직접 쓰기</button></div>
+  <textarea id="물음" rows="2">이 영상의 재료와 조리 순서를 표로 정리해 줘</textarea>
+  <div class="상황" id="상황2"></div>
+  <button class="주" id="뽑기">장면 뽑기 →</button>
+ </section>
+
+ <!-- 3 장면 고르기 · 보내기 -->
+ <section class="칸" id="칸3" hidden>
+  <div class="이름">3 · 장면 고르기 → 보내기</div>
+  <div class="진행" id="진행"><b></b></div>
+  <div class="요약"><span id="고른수">장면 0</span><span id="판수"></span></div>
+  <div class="격자" id="격자"></div>
+  <div class="칩들" id="꼴"><button class="칩 켬" data-v="판">장면판 (9칸 한 장)</button><button class="칩" data-v="낱장">낱장</button></div>
+  <div class="미리판" id="미리판"></div>
+  <div class="이름">함께 갈 글</div>
+  <textarea id="함께글" rows="3"></textarea>
+  <div class="상황" id="상황3"></div>
+  <button class="주" id="보내기">클로드에게 보내기</button>
+  <div class="줄"><button class="보조 넓" id="저장만">저장만</button><button class="보조 넓" id="다음4">클로드 답 받기 → 4</button></div>
+ </section>
+
+ <!-- 4 내용 문서 -->
+ <section class="칸" id="칸4" hidden>
+  <div class="이름">4 · 내용 문서만 꺼내기</div>
+  <p class="풀이">→ 클로드 앱에서 답을 길게 눌러 복사 → 아래에 붙여 넣기 (앱에 넣으면 「공유 → 문서보기」로 바로 옴)</p>
+  <input type="text" id="제목" placeholder="제목">
+  <textarea id="답" rows="6" placeholder="클로드 답 붙여 넣기"></textarea>
+  <div class="문서" id="문서"></div>
+  <div class="내보내기">
+   <button id="복사"><em>⧉</em>복사</button><button id="md"><em>📝</em>글 파일</button>
+   <button id="docx"><em>📄</em>워드</button><button class="주색" id="문서보내기"><em>↗</em>보내기</button></div>
+  <div class="상황" id="상황4"></div>
+ </section>
+
+ <div class="서명">DSM · 36 화면캡처 · v0.1</div>
+</div>
+<script src="영상.js"></script>
+<script src="화면.js"></script>
+</body></html>
