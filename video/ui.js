@@ -219,7 +219,39 @@ $('문서보내기').onclick = async () => {
   } catch (e) { $('상황4').textContent = e.name === 'AbortError' ? '보내기를 닫았음' : '못 보냄 → ' + e.message; }
 };
 
-// ⑥ 시험 걸쇠 — 영상.html?시험=1 이면 3_시험\시험.js 를 불러 저절로 돌림
+// ⑥ 갤럭시 문서보기 앱 안에서 (34번에 실렸을 때) ─────────────
+//   · 「영상 가져오기」 → 앱의 파일 고르기(Android.pickFile) → 껍데기가 앱 안에 복사하고 앱.받음() 을 부름
+//   · video/index.html?doc=<id>&name=…  → 받은 영상(갤러리 「공유」 · 목록에서 누름)을 바로 엶
+//   · video/index.html?text=1          → 클로드 앱에서 「공유」 한 답 글을 4 단계에 넣음
+const 주소값 = new URLSearchParams(location.search);
+async function 받은영상열기(id, 이름) {
+  const 주소 = window.Android ? `/doc/${encodeURIComponent(id)}` : `../doc/${encodeURIComponent(id)}`;   // 웹앱은 일꾼(sw.js)이 보관함에서 내줌
+  단계(2); $('상황2').textContent = '받은 영상 여는 중 …';
+  try {
+    const r = await fetch(주소); if (!r.ok) throw new Error('받은 영상을 못 찾음 ' + r.status);
+    const b = await r.blob();
+    상태.출처 = '받은 영상';
+    await 가져오기(new File([b], 이름 || '영상', { type: b.type && b.type.startsWith('video/') ? b.type : 'video/mp4' }));
+  } catch (e) { $('상황2').textContent = '영상을 못 엶 → ' + e.message; }
+}
+if (window.Android && window.Android.pickFile) {
+  $('놓는곳').addEventListener('click', e => { e.preventDefault(); window.Android.pickFile(); });
+  window.앱 = {                                    // 껍데기가 «새 파일 받음» 을 알릴 때 (문서보기 app.js 와 같은 이름)
+    받음() {
+      const s = window.Android.takePending(); if (!s) return;
+      let p; try { p = JSON.parse(s); } catch (e) { return; }
+      if (p.error) { 단계(1); $('상황2').textContent = '받은 파일을 못 읽음 → ' + p.error; return; }
+      받은영상열기(p.id);
+    },
+  };
+}
+
+// ⑦ 시험 걸쇠 — 영상.html?시험=1 이면 3_시험\시험.js 를 불러 저절로 돌림
 window.화면 = { 상태, 단계, 가져오기, 뽑기실행, 격자그리기, 요약그리기, 보낼파일들, 지금md, 문서그리기 };
 단계(1);
+if (주소값.get('doc')) 받은영상열기(주소값.get('doc'), 주소값.get('name'));
+if (주소값.get('text') && window.Android && window.Android.takeSharedText) {
+  const 받은글 = window.Android.takeSharedText();
+  if (받은글) { 단계(4); $('답').value = 받은글; 문서그리기(); $('상황4').textContent = '클로드 답을 받았음 → 제목 확인 · 보내기'; }
+}
 if (/[?&]시험=1/.test(decodeURIComponent(location.search))) { const s = document.createElement('script'); s.src = '../3_시험/시험.js'; document.body.appendChild(s); }

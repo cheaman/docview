@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1d24" media="(prefers-color-scheme: dark)">
-<meta name="docview-ver" content="1004-070708">
+<meta name="docview-ver" content="1004-075046">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="app.css">
@@ -47,7 +47,7 @@
 
 <!-- ③-① 최근 목록 -->
 <section id="home" class="view">
-  <header class="bar"><h1>문서 보기</h1></header>
+  <header class="bar"><h1>문서 보기</h1><a class="tovideo" href="video/index.html">🎬 영상 → 클로드</a></header>
   <main id="list" class="list"></main>
   <div id="empty" class="empty" hidden>
     <div class="big"><svg class="ico"><use href="#i-doc"/></svg></div>
@@ -55,6 +55,7 @@
     <div class="how">
       <div><b>카톡에서</b> → 파일 누름 → <span class="pill">⋮</span> → <span class="pill">다른 앱으로 열기</span> → 문서 보기</div>
       <div><b>되는 파일</b> → PDF · 한글(HWP · HWPX) · 워드(DOC · DOCX) · TXT · 엑셀(XLS · XLSX) · HTML · 그림(JPG · PNG · HEIC 등) · 도면(DXF)</div>
+      <div><b>녹화 영상</b> → 갤러리에서 <span class="pill">공유</span> → 문서 보기 → 장면판으로 클로드에게 (위 🎬)</div>
     </div>
   </div>
   <button id="pick" class="fab"><svg class="ico"><use href="#i-open"/></svg>파일 열기</button>

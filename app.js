@@ -147,6 +147,9 @@ function 열기(id, 쌓기) {
   목록그리기();
   const d = 목록.find(x => x.id === id);
   if (!d) { 알림판('목록에 없음 → 다시 받아 열기'); return; }
+  if (영상형식.includes((d.ext || '').toLowerCase())) {          // 10-04 · 녹화 영상 → 36번 영상 화면 (장면판 → 클로드)
+    location.href = `video/index.html?doc=${encodeURIComponent(d.id)}&name=${encodeURIComponent(d.name || '')}`; return;
+  }
   if (쌓기 && history.state?.v !== 'viewer') history.pushState({ v: 'viewer' }, '');
   $('#home').hidden = true; $('#viewer').hidden = false;
   $('#vname').textContent = d.name;
@@ -169,6 +172,7 @@ function 열기(id, 쌓기) {
 }
 // ③-3 그림 — 브라우저가 그리는 것은 원본 그대로, HEIC 등은 껍데기가 JPEG 로 바꿔 줌 (/img/) · 확대 · 밀기는 PDF 와 같음
 const 그림형식 = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif'];
+const 영상형식 = ['mp4', 'mov', 'm4v', 'webm', '3gp', 'mkv'];
 function 그림열기(d) {
   const 바꿈 = ['heic', 'heif'].includes(지금.ext);
   const 주소 = 폰 && 바꿈 ? `/img/${encodeURIComponent(d.id)}` : 문서주소(d);   // 아이폰 사파리는 HEIC 를 바로 그림

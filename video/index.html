@@ -5,10 +5,11 @@
 <!-- 36번 화면캡처 · v0.1 (2026-10-04) — 영상을 장면판 그림 + 글로 바꿔 클로드에게, 클로드 답은 내용 문서로
      PC 크롬에서 먼저 시험하는 화면. 34번 문서보기 「영상」 칸으로 옮겨 갈 것.
      글꼴 : 시험 화면만 인터넷(jsdelivr)에서 받음 — 앱에 넣을 때는 글꼴 파일을 묶어 넣는다 (인터넷 권한 없음) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="영상.css">
+<link rel="stylesheet" href="video.css">
+<style>.집{font-size:14px;font-weight:600;color:var(--c);text-decoration:none;align-self:flex-start;padding:4px 0}</style>
 </head><body>
 <div class="앱">
+ <a class="집" href="../index.html">‹ 문서보기</a>
  <div class="머리"><span class="표식">DSM<i><u></u><u></u><u></u><u></u></i></span><h1>영상 → 클로드</h1></div>
  <div class="단계" id="단계"><span data-n="1">1 가져오기</span><span data-n="2">2 자르기</span><span data-n="3">3 장면 고르기</span><span data-n="4">4 내용 문서</span></div>
 
@@ -72,6 +73,6 @@
 
  <div class="서명">DSM · 36 화면캡처 · v0.1</div>
 </div>
-<script src="영상.js"></script>
-<script src="화면.js"></script>
+<script src="video.js"></script>
+<script src="ui.js"></script>
 </body></html>

@@ -236,7 +236,8 @@ const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = 
 // 폰 : 공유 창(카톡 · 클로드 · 메모 …) · PC : 내려받기 + 글은 복사해 둠
 // 34번에 넣을 때 : 껍데기에 «여러 파일 공유» 다리(shareFiles)를 더하면 그 길을 먼저 탐
 영상.보내기 = async function (파일들, 글) {
-  if (window.다리 && 다리.shareFiles) { await 다리.shareFiles(파일들, 글 || ''); return '공유'; }
+  const 앱 = window.Android;
+  if (앱 && 앱.shareMultiBegin) { await 영상.앱으로(앱, 파일들, 글); return '공유'; }
   if (navigator.canShare && navigator.canShare({ files: 파일들 })) {
     await navigator.share(글 ? { files: 파일들, text: 글 } : { files: 파일들 });
     return '공유';
@@ -248,4 +249,23 @@ const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = 
   }
   if (글) { try { await navigator.clipboard.writeText(글); } catch (e) { /* 복사 못 해도 파일은 받음 */ } }
   return '내려받기';
+};
+
+// 갤럭시 문서보기 앱 안 — 다리로는 글자만 오가므로 파일마다 base64 조각(384KB)으로 넘기고, 껍데기가 공유 창을 띄움
+//   shareMultiBegin() → [shareMultiFile(이름) → shareChunk(조각)…] × 파일 수 → shareMultiEnd(꼴, 글)
+영상.앱으로 = async function (앱, 파일들, 글) {
+  if (!앱.shareMultiBegin()) throw new Error('보낼 파일을 못 만듦');
+  const 크기 = 393216;
+  for (const f of 파일들) {
+    if (!앱.shareMultiFile(f.name)) throw new Error('보낼 파일을 못 만듦');
+    const b = new Uint8Array(await f.arrayBuffer());
+    for (let i = 0; i < b.length; i += 크기) {
+      const 덩 = b.subarray(i, i + 크기); let s = '';
+      for (let k = 0; k < 덩.length; k += 8192) s += String.fromCharCode.apply(null, 덩.subarray(k, k + 8192));
+      if (!앱.shareChunk(btoa(s))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+    }
+    await 쉼(0);
+  }
+  const 꼴 = 파일들.every(f => (f.type || '').startsWith('image/')) ? 'image/*' : '*/*';
+  if (!앱.shareMultiEnd(꼴, 글 || '')) throw new Error('공유 창을 못 띄움');
 };
