@@ -84,7 +84,8 @@ function 목록그리기() {
   let h = '';
   for (const [k, arr] of Object.entries(묶음)) {
     if (!arr.length) continue;
-    h += `<div class="sec">${k}</div>`;
+    if (h) h += '</div>';
+    h += `<div class="sec">${k}</div><div class="묶음">`;              // DSM (10-04) — 때 묶음마다 카드 하나 + 가는 줄
     for (const d of arr) {
       const ext = (d.ext || '').toLowerCase();
       h += `<div class="item" data-id="${글(d.id)}" role="button">
@@ -94,7 +95,7 @@ function 목록그리기() {
       </div>`;
     }
   }
-  $('#list').innerHTML = h;
+  $('#list').innerHTML = h ? h + '</div>' : '';
 }
 // 목록 딱지 색 — 첫 화면 · ZIP 안 목록(zipview.js) 같이 씀
 function 딱지(ext) {
@@ -1058,5 +1059,7 @@ window.앱 = {
   },
 };
 window.판닫기 = 판닫기;
+// DSM 서명 줄 (10-04) — 「DSM · 34 문서보기 · 판」 · 판은 껍데기(갤럭시 versionName 앞 낱말 · 웹 판 번호)에서
+try { const 판 = String(다리.version?.() || '').split(' · ')[0].trim(); if (판) $('#sign').textContent = `DSM · 34 문서보기 · ${/^\d/.test(판) ? 'v' + 판 : 판}`; } catch (e) {}
 목록그리기();
 앱.받음();

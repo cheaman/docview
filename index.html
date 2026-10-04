@@ -7,16 +7,17 @@
 <!-- 문서 보기 — 보기 화면 (2단계 · 2026-10-03 · 시안 B 종이)
      구역 지도 : ① 색 이름 ② 모양 ③ 화면 뼈대(목록 · 보기 · 판) ④ app.js
      PC 크롬에서 열면 가짜 다리(시험용 목록)로 돈다 — 폰에서는 앱 껍데기의 window.Android 를 씀 -->
+<link rel="stylesheet" href="dsm/dsm.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="문서 보기">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1a1d24" media="(prefers-color-scheme: dark)">
-<meta name="docview-ver" content="1004-155855">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="docview-ver" content="1004-221142">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/favicon-32.png">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -47,7 +48,7 @@
 
 <!-- ③-① 최근 목록 -->
 <section id="home" class="view">
-  <header class="bar"><h1>문서 보기</h1><a class="tovideo" href="video/index.html">🎬 영상 → 클로드</a></header>
+  <header class="bar"><span class="dsm-mark" aria-hidden="true"><b>DSM</b><i><u></u><u></u><u></u><u></u></i></span><h1>문서 보기</h1><a class="tovideo" href="video/index.html">🎬 영상</a></header>
   <main id="list" class="list"></main>
   <div id="empty" class="empty" hidden>
     <div class="big"><svg class="ico"><use href="#i-doc"/></svg></div>
@@ -59,6 +60,7 @@
     </div>
   </div>
   <button id="pick" class="fab"><svg class="ico"><use href="#i-open"/></svg>파일 열기</button>
+  <div class="서명" id="sign">DSM · 34 문서보기</div>
 </section>
 
 <!-- ③-② 보기 -->
