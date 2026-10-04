@@ -19,6 +19,7 @@ const PDF길 = window.웹PDF || {
   쪽: async (id, n, w) => `/pdf/${encodeURIComponent(id)}/p/${n}?w=${w}`,
   찾기: (id, q) => fetch(`/pdf/${encodeURIComponent(id)}/find?q=${encodeURIComponent(q)}`).then(r => r.json()),
   놓기: () => {},
+  ...(window.Android ? { 글: id => fetch(`/pdf/${encodeURIComponent(id)}/text`).then(r => r.json()) } : {}),   // 쪽마다 글 (0.9.6 · 안드로이드 15 이상)
 };
 const 그림놓기 = img => { if (img?.src?.startsWith('blob:')) URL.revokeObjectURL(img.src); };
 const 그림주소놓기 = u => { if (typeof u === 'string' && u.startsWith('blob:')) URL.revokeObjectURL(u); };
@@ -48,6 +49,7 @@ const 다리 = window.Android || window.웹다리 || {
   },
   setInfo: (id, k, v) => { const o = (PC덧['i' + id] ||= {}); if (v && !(k === '돌림' && v === '0')) o[k] = v; else delete o[k]; PC덧저장(); },
   loadMarks: id => PC덧['m' + id] || '',
+  loadText: id => PC글.get(id) || '', saveText: (id, j) => { j ? PC글.set(id, j) : PC글.delete(id); return true; },   // 문서 속 글 (0.9.6) — PC 는 이 창 안에만
   saveMarks: (id, j) => { if (j) PC덧['m' + id] = j; else delete PC덧['m' + id]; PC덧저장(); return true; },
   remove: id => { delete PC덧['i' + id]; delete PC덧['m' + id]; PC덧저장(); },
   takePending: () => '', pickFile: () => 알림판('PC 시험 화면 → 파일 고르기는 폰에서'),
@@ -65,7 +67,7 @@ const 다리 = window.Android || window.웹다리 || {
   saveBytes: (폴더, n, b) => { (window.마지막저장 ||= []).push({ 폴더, 이름: n, 크기: b.length }); return true; },
   copyImage: 약속 => 약속.then(b => { window.마지막복사 = b; }),          // 복사 (10-04) — PC 는 window.마지막복사 에 그림만
 };
-const PC꺼낸것 = [];
+const PC꺼낸것 = [], PC글 = new Map();
 if (!window.Android && !window.웹다리) { const 옛 = 다리.recent; 다리.recent = () => JSON.stringify([...PC꺼낸것.map(d => ({ ...d, ...(PC덧['i' + d.id] || {}) })), ...JSON.parse(옛())]); }
 const $ = s => document.querySelector(s);
 const 글 = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -100,7 +102,7 @@ function 칩줄그리기() {
   $('#kinds').innerHTML = `<div class="나눔"><button data-m="형식" class="${형식 ? 'on' : ''}">형식</button><button data-m="묶음" class="${형식 ? '' : 'on'}">묶음</button></div>`
     + 칩('모두', 목록.length) + 차례.map(k => 칩(k, 셈.get(k))).join('')
     + (형식 ? '' : '<button class="칩" data-k="＋" aria-label="새 묶음">＋ 묶음</button>');
-  $('#kinds').hidden = 목록.length === 0;
+  $('#kinds').hidden = 목록.length === 0 || 찾는중;
 }
 // 묶음 권함 — 파일 이름에 같은 낱말이 든 것 셋 이상 (흔한 말 · 숫자 뺌) · 「됐음」 한 낱말은 다시 안 물음 · 인터넷 · AI 없음
 const 흔한말 = new Set(['보고서', '최종', '수정', '수정본', '사본', '자료', '파일', '문서', '첨부', '회신', '최신', '검토', '의견', '결과', '목록', '시험', '사진', '카톡', '복사본', 'copy', 'final', 'scan', 'img', 'image', 'screenshot', 'kakaotalk', 'photo', 'document']);
@@ -124,6 +126,7 @@ function 묶음권함() {
 function 목록그리기() {
   try { 목록 = JSON.parse(다리.recent() || '[]'); } catch (e) { 목록 = []; }
   if (고름) for (const id of [...고름]) if (!목록.some(d => d.id === id)) 고름.delete(id);
+  if (찾는중) { $('#empty').hidden = true; $('#list').hidden = false; 칩줄그리기(); 찾기그리기(); return 고르기판갱신(); }
   $('#empty').hidden = 목록.length > 0;
   $('#list').hidden = 목록.length === 0;
   칩줄그리기();
@@ -182,14 +185,18 @@ function 고르기끝() {
 }
 function 고르기판갱신() {
   const 켬 = !!고름;
-  $('#homebar').hidden = 켬; $('#selbar').hidden = !켬; $('#pick').hidden = 켬; $('#selfoot').hidden = !켬;
+  $('#homebar').hidden = 켬 || 찾는중; $('#selbar').hidden = !켬; $('#pick').hidden = 켬 || 찾는중; $('#selfoot').hidden = !켬; $('#gbar').hidden = !찾는중;
   if (!켬) return;
   const n = 고름.size, 보일것 = 목록.filter(통과);
   $('#selcnt').textContent = `${n}개 고름`;
   $('#selall').textContent = 보일것.length && 보일것.every(d => 고름.has(d.id)) ? '다 풀기' : '다 고르기';
   $('#seldel').textContent = n ? `${n}개 지우기` : '지우기';
   $('#seldel').disabled = !n; $('#selgroup').disabled = !n; $('#selfav').disabled = !n;
-  $('#selfav').textContent = n && [...고름].every(id => 목록.find(d => d.id === id)?.즐겨) ? '⭐ 빼기' : '⭐ 즐겨찾기';
+  const 사진만 = n > 0 && [...고름].every(id => 그림형식.includes(String(목록.find(d => d.id === id)?.ext || '').toLowerCase()));   // ④ 그림만 골랐을 때 「PDF 로」 (0.9.6)
+  $('#selpdf').hidden = !사진만;
+  const 견줄 = n === 2 && [...고름].every(id => ['pdf', 'pptx'].includes(String(목록.find(d => d.id === id)?.ext || '').toLowerCase()));   // ⑪ PDF · PPT 둘 (0.9.6)
+  $('#selcmp').hidden = !견줄;
+  $('#selfav').textContent = n && [...고름].every(id => 목록.find(d => d.id === id)?.즐겨) ? '⭐ 빼기' : (사진만 || 견줄 ? '⭐' : '⭐ 즐겨찾기');
 }
 function 묶음붙이기(ids, 이름) {
   for (const id of ids) {
@@ -236,6 +243,233 @@ function 묶음관리판(이름) {
   $('#ungroup').onclick = () => 바꿈('');
   $('#renameok').onclick = () => { const 새 = $('#rename').value.replace(/\s+/g, ' ').trim(); if (새 && 새 !== 이름) 바꿈(새); else 판닫기(); };
 }
+// ④ 사진 여러 장 → PDF 한 권 (0.9.6 · 목업 1_읽을거리\여덟가지_목업.html ④) — 고른 차례대로 · 끌어서 차례 바꿈 · A4 에 맞춤 / 그림 크기
+//   펜 · 형광 · 도형 · 글 · 위치 메모 · 돌림을 입혀서 (원래 그림은 그대로) → 목록에 새 PDF 로 넣고 열어 보내기 판
+async function 그림받기(d) {                               // 문서 그림 → Image (아이폰 웹은 보관함 blob · 갤럭시 HEIC 는 껍데기가 JPEG 로)
+  const ext = String(d.ext || '').toLowerCase();
+  let 주소 = 폰 && ['heic', 'heif'].includes(ext) ? `/img/${encodeURIComponent(d.id)}` : 문서주소(d), 놓을 = null;
+  if (웹) { const r = await fetch(주소); if (!r.ok) throw new Error('원본 없음 · ' + d.name); 주소 = 놓을 = URL.createObjectURL(await r.blob()); }
+  try { return await 보내기.그림받기(주소); } catch (e) { throw new Error('그림을 못 읽음 · ' + d.name); } finally { if (놓을) setTimeout(() => URL.revokeObjectURL(놓을), 600000); }
+}
+function 사진PDF판() {
+  const 들 = [...고름].map(id => 목록.find(d => d.id === id)).filter(Boolean);
+  if (!들.length) return;
+  const 오늘 = new Date(), 날 = String(오늘.getMonth() + 1).padStart(2, '0') + String(오늘.getDate()).padStart(2, '0');
+  const 밑 = String(들[0].name || '사진').replace(/\.[^.]+$/, '');
+  let 용지 = 'A4';
+  판열기(`<h3>PDF 한 권으로 <span class="흐림">· ${들.length}장</span></h3>
+    <div class="pdf썸들" id="pdfthumbs"></div>
+    <div class="판설명">끌어서 차례 바꿈 · 펜 · 메모 · 돌림도 입혀서 · 원래 그림은 그대로</div>
+    <div class="opt"><span class="lab">용지</span><div class="seg" id="pdfpaper"><button data-v="A4" class="on">A4 에 맞춤</button><button data-v="원래">그림 크기 그대로</button></div></div>
+    <div class="row"><input id="pdfname" type="text" maxlength="60" enterkeyhint="done"></div>
+    <div class="row 끝줄"><span style="flex:1"></span><button class="btn plain" onclick="판닫기()">닫기</button><button class="btn" id="pdfok">만들기</button></div>`);
+  $('#pdfname').value = `${밑}${들.length > 1 ? ` 외 ${들.length - 1}장` : ''} · ${날}`;
+  const 주소들 = new Map();
+  const 그리기 = () => {
+    $('#pdfthumbs').innerHTML = 들.map((d, k) => `<div class="pdf썸" data-id="${글(d.id)}"><b>${k + 1}</b></div>`).join('');
+    for (const el of $('#pdfthumbs').children) {
+      const d = 들.find(x => x.id === el.dataset.id), 있음 = 주소들.get(d.id);
+      if (있음) { el.prepend(Object.assign(new Image(), { src: 있음, alt: '' })); continue; }
+      그림받기(d).then(im => { 주소들.set(d.id, im.src); if (el.isConnected) el.prepend(Object.assign(new Image(), { src: im.src, alt: '' })); }, () => {});
+    }
+  };
+  그리기();
+  // 끌어서 차례 바꾸기 — 손가락 아래 칸과 자리를 맞바꿈
+  let 끄는 = null;
+  $('#pdfthumbs').onpointerdown = e => { const el = e.target.closest('.pdf썸'); if (!el) return; 끄는 = el.dataset.id; el.classList.add('끄는중'); };
+  $('#pdfthumbs').onpointermove = e => {
+    if (!끄는) return;
+    const 아래 = document.elementFromPoint(e.clientX, e.clientY)?.closest('.pdf썸'); if (!아래 || 아래.dataset.id === 끄는) return;
+    const a = 들.findIndex(d => d.id === 끄는), b = 들.findIndex(d => d.id === 아래.dataset.id);
+    const [옮김] = 들.splice(a, 1); 들.splice(b, 0, 옮김); 그리기();
+    $('#pdfthumbs').querySelector(`.pdf썸[data-id="${CSS.escape(끄는)}"]`)?.classList.add('끄는중');
+  };
+  const 놓음 = () => { 끄는 = null; $('#pdfthumbs')?.querySelectorAll('.끄는중').forEach(x => x.classList.remove('끄는중')); };
+  $('#pdfthumbs').onpointerup = 놓음; $('#pdfthumbs').onpointercancel = 놓음; $('#pdfthumbs').onpointerleave = 놓음;
+  $('#pdfpaper').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; 용지 = b.dataset.v; $('#pdfpaper').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
+  $('#pdfok').onclick = () => { const 이름 = ($('#pdfname').value.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 밑) + '.pdf'; 판닫기(); 사진PDF만들기([...들], 용지, 이름); };
+}
+async function 사진PDF만들기(들, 용지, 이름) {
+  if (보내는중) return;
+  보내는중 = true;
+  const 진행 = 말 => { const c = $('#chip'); c.textContent = 말; c.hidden = false; clearTimeout(칩시계); };
+  try {
+    const 쪽들 = [], 뺌 = [];
+    for (const [i, d] of 들.entries()) {
+      진행(`PDF 만드는 중 ${i + 1} / ${들.length}`);
+      await new Promise(r => setTimeout(r, 20));
+      let im; try { im = await 그림받기(d); } catch (e) { 뺌.push(d.name); continue; }   // 못 읽는 그림은 빼고 알림
+      const w0 = im.naturalWidth, h0 = im.naturalHeight, k = Math.min(1, 2400 / Math.max(w0, h0));
+      const 작 = document.createElement('canvas'); 작.width = Math.max(1, Math.round(w0 * k)); 작.height = Math.max(1, Math.round(h0 * k));
+      작.getContext('2d').drawImage(im, 0, 0, 작.width, 작.height);
+      const 표 = 표시읽기(d.id), 돌 = (Number(d.돌림) || 0) & 3;
+      let c = 보내기.쪽캔버스(작, 돌, 표.쪽['0'], null); 작.width = 작.height = 0;
+      보내기.메모그리기(c, (표.메모 || []).filter(m => m.k === '0'), { 돌, 번호표: { n: 0, 목록: [] } });
+      let pw, ph;
+      if (용지 === 'A4') {                                    // A4 (가로 사진은 가로 A4) · 가장자리 4% · 150 dpi 남짓
+        const 가로 = c.width > c.height; pw = 가로 ? 842 : 595; ph = 가로 ? 595 : 842;
+        const 판 = document.createElement('canvas'); 판.width = Math.round(pw * 2.5); 판.height = Math.round(ph * 2.5);
+        const x = 판.getContext('2d'), 여 = 판.width * 0.04, 배 = Math.min((판.width - 2 * 여) / c.width, (판.height - 2 * 여) / c.height);
+        x.fillStyle = '#ffffff'; x.fillRect(0, 0, 판.width, 판.height);
+        x.drawImage(c, (판.width - c.width * 배) / 2, (판.height - c.height * 배) / 2, c.width * 배, c.height * 배);
+        c.width = c.height = 0; c = 판;
+      } else { pw = c.width * 0.75; ph = c.height * 0.75; }      // 그림 크기 그대로 (96 dpi)
+      쪽들.push({ jpg: await 보내기.바이트(c, 'image/jpeg', 0.88), w: c.width, h: c.height, pw, ph });
+      c.width = c.height = 0;
+    }
+    if (!쪽들.length) throw new Error('읽을 수 있는 그림이 없음');
+    진행('목록에 넣는 중…');
+    const id = await 새문서넣기(이름, '사진 묶음', 보내기.PDF(쪽들));
+    if (!id) throw new Error('파일을 못 만듦 · 폰 저장 공간 확인');
+    $('#chip').hidden = true;
+    고름 = null; if (history.state?.v === '고르기') history.replaceState({ v: 'viewer' }, '');   // 고르기 한 칸을 보기 칸으로 → 뒤로 = 목록
+    열기(String(id), false);
+    for (let i = 0; i < 100 && !(지금?.id === String(id) && 지금.자리됨); i++) await new Promise(r => setTimeout(r, 100));
+    if (지금?.id === String(id)) { $('#resume').hidden = true; 보내기판(); }
+    if (뺌.length) 알림(`<b>못 읽은 그림 ${뺌.length}장은 뺌</b><div class="sm">${글(뺌.join(' · '))}</div>`);
+  } catch (e) {
+    $('#chip').hidden = true;
+    알림판(`PDF 만들기 실패 → ${e.message || e}`);
+  } finally { 보내는중 = false; }
+}
+async function 새문서넣기(이름, 어디서, b) {                // 최근 목록에 새 문서로 (zipview.js 넣기와 같은 길)
+  if (다리.addBytes) return 다리.addBytes(이름, 어디서, b);
+  if (!다리.addBegin) throw new Error('앱이 옛 판 → 새 판 설치');
+  if (!다리.addBegin(이름, 어디서)) throw new Error('파일을 못 만듦');
+  for (let i = 0; i < b.length; i += 393216) {
+    const 덩 = b.subarray(i, i + 393216); let s = '';
+    for (let k = 0; k < 덩.length; k += 8192) s += String.fromCharCode.apply(null, 덩.subarray(k, k + 8192));
+    if (!다리.addChunk(btoa(s))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+    await new Promise(r => setTimeout(r));
+  }
+  return 다리.addEnd();
+}
+// ⑪ 두 판 견주기 (0.9.6 · 목업 1_읽을거리\여덟가지_목업.html ⑪ 「겹쳐서 빨강 + 앞 · 뒤 칩」)
+//   ① 두 문서 쪽을 작게(가로 240) 떠서 회색 값으로 · ② 비슷한 쪽끼리 짝 (쪽이 밀려도 · 편집 거리) · ③ 짝마다 4 화소 칸으로 견줘 달라진 칸 → 네모로 묶음
+//   ④ 보기 : 겹침 = 같은 것 검정 · 앞에만 있는 것 빨강 · 뒤에만 있는 것 파랑 + 달라진 곳 빨강 네모 · 앞 판 · 뒤 판 · ⌃⌄ 달라진 쪽만
+//   먼저 받은 문서가 앞 판 (⇄ 로 바꿈) · 원본은 안 고침 · 인터넷 · AI 없음
+const 견 = { 앞: null, 뒤: null, 짝: [], 지금: 0, 방식: '겹침', 번호: 0 };
+const 길고르기 = d => (String(d.ext).toLowerCase() === 'pptx' ? PPT길 : PDF길);
+async function 쪽그림(d, n, w) { const u = await 길고르기(d).쪽(d.id, n, w); try { return await 보내기.그림받기(u); } finally { setTimeout(() => 그림주소놓기(u), 2000); } }
+function 회색(im, W) {                                       // 가로 W 로 줄인 회색 값 (Uint8) · 높이는 비율대로
+  const H = Math.max(1, Math.round(W * (im.naturalHeight || im.height) / (im.naturalWidth || im.width)));
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', { willReadFrequently: true });
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(im, 0, 0, W, H);
+  const d = x.getImageData(0, 0, W, H).data, g = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) g[i] = (d[i * 4] * 3 + d[i * 4 + 1] * 6 + d[i * 4 + 2]) / 10;
+  c.width = c.height = 0;
+  return { g, W, H };
+}
+function 쪽거리(a, b) {                                       // 0(같음) ~ 1 — 위쪽 겹치는 높이만 · 8 화소 칸 평균끼리
+  const H = Math.min(a.H, b.H), 칸 = 8; let 합 = 0, n = 0;
+  for (let y = 0; y + 칸 <= H; y += 칸) for (let x = 0; x + 칸 <= a.W; x += 칸) {
+    let sa = 0, sb = 0; for (let yy = 0; yy < 칸; yy++) for (let xx = 0; xx < 칸; xx++) { const i = (y + yy) * a.W + x + xx; sa += a.g[i]; sb += b.g[i]; }
+    합 += Math.abs(sa - sb) / (칸 * 칸 * 255); n++;
+  }
+  return (n ? 합 / n : 1) * 4 + Math.abs(a.H - b.H) / Math.max(a.H, b.H);
+}
+function 짝짓기(A, B) {                                       // 편집 거리 — 짝 = 쪽거리 · 빼기 · 넣기 = 0.35
+  const n = A.length, m = B.length, 틈 = 0.35, D = Array.from({ length: n + 1 }, () => new Float64Array(m + 1)), 길 = Array.from({ length: n + 1 }, () => new Uint8Array(m + 1));
+  for (let i = 1; i <= n; i++) { D[i][0] = i * 틈; 길[i][0] = 1; } for (let j = 1; j <= m; j++) { D[0][j] = j * 틈; 길[0][j] = 2; }
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) {
+    const 짝 = D[i - 1][j - 1] + Math.min(1, 쪽거리(A[i - 1], B[j - 1])), 빼 = D[i - 1][j] + 틈, 넣 = D[i][j - 1] + 틈;
+    if (짝 <= 빼 && 짝 <= 넣) { D[i][j] = 짝; 길[i][j] = 0; } else if (빼 <= 넣) { D[i][j] = 빼; 길[i][j] = 1; } else { D[i][j] = 넣; 길[i][j] = 2; }
+  }
+  const 짝 = []; let i = n, j = m;
+  while (i > 0 || j > 0) { const k = 길[i][j]; if (i > 0 && j > 0 && k === 0) { 짝.push({ a: i - 1, b: j - 1 }); i--; j--; } else if (i > 0 && (j === 0 || k === 1)) { 짝.push({ a: i - 1, b: null }); i--; } else { 짝.push({ a: null, b: j - 1 }); j--; } }
+  return 짝.reverse();
+}
+function 다른칸(a, b) {                                        // 4 화소 칸 평균이 14 넘게 다르면 「다름」 → 이웃끼리 묶어 네모 [x0, y0, x1, y1] (0~1)
+  const 칸 = 4, cw = Math.floor(a.W / 칸), ch = Math.floor(Math.max(a.H, b.H) / 칸), 표 = new Uint8Array(cw * ch);
+  for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) {
+    let sa = 0, sb = 0;
+    for (let yy = 0; yy < 칸; yy++) for (let xx = 0; xx < 칸; xx++) { const y = cy * 칸 + yy, x = cx * 칸 + xx; sa += y < a.H ? a.g[y * a.W + x] : 255; sb += y < b.H ? b.g[y * b.W + x] : 255; }
+    if (Math.abs(sa - sb) / (칸 * 칸) > 14) 표[cy * cw + cx] = 1;
+  }
+  const 봄 = new Uint8Array(cw * ch), 네모 = [];
+  for (let s0 = 0; s0 < 표.length; s0++) {
+    if (!표[s0] || 봄[s0]) continue;
+    let x0 = cw, y0 = ch, x1 = 0, y1 = 0, 수 = 0; const 줄 = [s0]; 봄[s0] = 1;
+    while (줄.length) {
+      const s = 줄.pop(), x = s % cw, y = (s / cw) | 0; 수++;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= cw || Y >= ch) continue; const t = Y * cw + X; if (표[t] && !봄[t]) { 봄[t] = 1; 줄.push(t); } }
+    }
+    if (수 >= 2) 네모.push([(x0 - 0.5) / cw, (y0 - 0.5) * 칸 / a.H, (x1 + 1.5) / cw, (y1 + 1.5) * 칸 / a.H]);
+  }
+  return 네모;
+}
+async function 견주기열기(앞, 뒤) {
+  if (!$('#viewer').hidden) 목록으로();                       // 보기 화면 위에 겹쳐 뜨지 않게
+  고름 = null; if (history.state?.v === '고르기') history.replaceState({ v: '견주기' }, ''); else if (history.state?.v !== '견주기') history.pushState({ v: '견주기' }, '');
+  Object.assign(견, { 앞, 뒤, 짝: [], 지금: 0, 방식: '겹침', 번호: 견.번호 + 1 });
+  const 번호 = 견.번호;
+  $('#home').hidden = true; $('#cmpview').hidden = false; $('#cmpbox').classList.remove('크게'); $('#cmpzoom').textContent = '크게';
+  $('#cmpmode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === '겹침'));
+  $('#cmpname').textContent = `${앞.name} ⇄ ${뒤.name}`; $('#cmpsub').textContent = '견줄 준비 중…';
+  const cv = $('#cmpcv'); cv.width = cv.height = 0;
+  const 알림 = 말 => { $('#cmpnote').hidden = !말; $('#cmpnote').textContent = 말 || ''; };
+  try {
+    const [ia, ib] = [await 길고르기(앞).정보(앞.id), await 길고르기(뒤).정보(뒤.id)];
+    if (ia.error || ib.error) throw new Error(ia.error || ib.error);
+    const 모두 = ia.pages + ib.pages; let 됨 = 0;
+    const 뜨기 = async (d, n) => { const g = 회색(await 쪽그림(d, n, 480), 240); 됨++; if (번호 === 견.번호) 알림(`견줄 준비 ${됨} / ${모두}쪽`); return g; };
+    const A = [], B = [];
+    for (let i = 0; i < ia.pages; i++) { if (번호 !== 견.번호) return; A.push(await 뜨기(앞, i)); }
+    for (let j = 0; j < ib.pages; j++) { if (번호 !== 견.번호) return; B.push(await 뜨기(뒤, j)); }
+    견.짝 = 짝짓기(A, B).map(z => ({ ...z, 네모: z.a != null && z.b != null ? 다른칸(A[z.a], B[z.b]) : null }));
+    for (const z of 견.짝) z.바뀜 = z.a == null || z.b == null || z.네모.length > 0;
+    알림(''); 견.지금 = Math.max(0, 견.짝.findIndex(z => z.바뀜)); 견그리기();
+  } catch (e) { if (번호 === 견.번호) { 알림(''); $('#cmpsub').textContent = '견주기 실패 · ' + (e.message || e); } }
+}
+async function 견그리기() {
+  const z = 견.짝[견.지금]; if (!z) return;
+  const 번호 = 견.번호, 바뀐 = 견.짝.filter(x => x.바뀜).length, 단 = String(견.앞.ext).toLowerCase() === 'pptx' ? '장' : '쪽';
+  const 상태 = z.a == null ? `뒤 판에 새로 생긴 ${단}` : z.b == null ? `뒤 판에서 빠진 ${단}` : z.네모.length ? `달라진 곳 ${z.네모.length}` : '같음';
+  $('#cmpsub').textContent = `${상태} · 달라진 ${단} ${바뀐} / ${견.짝.length}`;
+  $('#cmppage').textContent = z.a != null && z.b != null && z.a !== z.b ? `${z.a + 1} ↔ ${z.b + 1}${단}` : `${(z.b ?? z.a) + 1}${단}`;
+  const W = Math.min(2000, Math.round($('#cmpbox').clientWidth * (devicePixelRatio || 1) * ($('#cmpbox').classList.contains('크게') ? 2 : 1)));
+  const 방식 = z.a == null ? '뒤' : z.b == null ? '앞' : 견.방식;
+  const [ia, ib] = await Promise.all([방식 !== '뒤' && z.a != null ? 쪽그림(견.앞, z.a, W) : null, 방식 !== '앞' && z.b != null ? 쪽그림(견.뒤, z.b, W) : null]);
+  if (번호 !== 견.번호 || 견.짝[견.지금] !== z) return;
+  const 높 = im => Math.round(W * (im.naturalHeight || im.height) / (im.naturalWidth || im.width));
+  const H = Math.max(ia ? 높(ia) : 0, ib ? 높(ib) : 0), cv = $('#cmpcv'); cv.width = W; cv.height = H;
+  const x = cv.getContext('2d', { willReadFrequently: true });
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+  if (방식 === '겹침') {
+    const 판 = im => { const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d', { willReadFrequently: true }); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(im, 0, 0, W, 높(im)); const d = g.getImageData(0, 0, W, H).data; c.width = c.height = 0; return d; };
+    const a = 판(ia), b = 판(ib), out = x.createImageData(W, H), o = out.data;
+    for (let i = 0; i < o.length; i += 4) {
+      const la = (a[i] * 3 + a[i + 1] * 6 + a[i + 2]) / 10, lb = (b[i] * 3 + b[i + 1] * 6 + b[i + 2]) / 10, 앞먹 = la < 170, 뒤먹 = lb < 170;
+      if (앞먹 && 뒤먹) { o[i] = o[i + 1] = o[i + 2] = Math.min(la, lb) * 0.6; }
+      else if (앞먹 && Math.abs(la - lb) > 40) { o[i] = 225; o[i + 1] = 40; o[i + 2] = 45; }       // 앞에만 = 빨강 (빠진 것)
+      else if (뒤먹 && Math.abs(la - lb) > 40) { o[i] = 30; o[i + 1] = 100; o[i + 2] = 235; }      // 뒤에만 = 파랑 (새로 생긴 것)
+      else { const v = 255 - (255 - Math.min(la, lb)) * 0.35; o[i] = o[i + 1] = o[i + 2] = v; }
+      o[i + 3] = 255;
+    }
+    x.putImageData(out, 0, 0);
+  } else { const im = 방식 === '앞' ? ia : ib; x.drawImage(im, 0, 0, W, 높(im)); }
+  if (z.네모?.length) {
+    x.strokeStyle = '#d6262b'; x.lineWidth = Math.max(2, W / 400); x.fillStyle = 'rgba(214,38,43,0.08)';
+    for (const [x0, y0, x1, y1] of z.네모) { const r = [x0 * W, y0 * H, (x1 - x0) * W, (y1 - y0) * H]; x.fillRect(...r); x.strokeRect(...r); }
+  }
+}
+function 견옮기기(걸음, 바뀐것만) {
+  const n = 견.짝.length; if (!n) return;
+  let i = 견.지금;
+  for (let k = 0; k < n; k++) { i += 걸음; if (i < 0 || i >= n) return 칩(바뀐것만 ? '더 달라진 곳 없음' : '끝'); if (!바뀐것만 || 견.짝[i].바뀜) break; }
+  견.지금 = i; $('#cmpbox').scrollTop = 0; 견그리기();
+}
+function 견닫기() { 견.번호++; $('#cmpview').hidden = true; $('#home').hidden = false; $('#cmpcv').width = 0; 목록그리기(); }
+$('#cmpback').addEventListener('click', () => (history.state?.v === '견주기' ? history.back() : 견닫기()));
+$('#cmpprev').addEventListener('click', () => 견옮기기(-1, true));
+$('#cmpnext').addEventListener('click', () => 견옮기기(1, true));
+$('#cmpleft').addEventListener('click', () => 견옮기기(-1, false));
+$('#cmpright').addEventListener('click', () => 견옮기기(1, false));
+$('#cmpmode').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; 견.방식 = b.dataset.v; $('#cmpmode').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); 견그리기(); });
+$('#cmpzoom').addEventListener('click', () => { const 큼 = $('#cmpbox').classList.toggle('크게'); $('#cmpzoom').textContent = 큼 ? '작게' : '크게'; 견그리기(); });
+$('#cmpswap').addEventListener('click', () => { if (견.앞 && 견.뒤) { history.replaceState({ v: '견주기' }, ''); 견주기열기(견.뒤, 견.앞); } });
+
 // 목록 딱지 색 — 첫 화면 · ZIP 안 목록(zipview.js) 같이 씀
 function 딱지(ext) {
   return ['pdf', 'hwp', 'hwpx', 'doc', 'docx', 'txt'].includes(ext) ? ext : ['html', 'htm'].includes(ext) ? 'html' : ['xls', 'xlsx'].includes(ext) ? 'xls' : 그림형식.includes(ext) ? 'img' : ['dxf', 'dwg'].includes(ext) ? 'cad' : ['ppt', 'pptx'].includes(ext) ? 'ppt' : 압축형식.includes(ext) ? 'zip' : 'etc';
@@ -250,6 +484,8 @@ function 크기(b) { return b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Mat
 let 길게됨 = false;
 $('#list').addEventListener('click', e => {
   if (길게됨) { 길게됨 = false; return; }                          // 길게 눌러 고르기를 시작한 그 손가락
+  const 찾은 = e.target.closest('.찾은줄[data-id]');
+  if (찾은) return 찾아열기(찾은.dataset.id, $('#gq').value.trim(), 찾은.dataset.p === '' ? null : Number(찾은.dataset.p), Number(찾은.dataset.k));
   const 권 = e.target.closest('[data-권함]');
   if (권) {
     const w = 권.dataset.w;
@@ -284,7 +520,7 @@ function 길게(틀, 고름표, 할일) {
   for (const k of ['pointerup', 'pointercancel', 'pointermove', 'pointerleave']) 틀.addEventListener(k, 그만);
   틀.addEventListener('contextmenu', e => { if (e.target.closest(고름표)) e.preventDefault(); });
 }
-길게($('#list'), '.item', (it, 손) => { navigator.vibrate?.(15); 고르기시작(it.dataset.id); 문지름시작(it.dataset.id, true, 손); });
+길게($('#list'), '.item', (it, 손) => { if (찾는중) return; navigator.vibrate?.(15); 고르기시작(it.dataset.id); 문지름시작(it.dataset.id, true, 손); });
 
 // 문질러 고르기 (10-05 · 전무님 「아이폰 · 갤럭시처럼 문질러서 선택」)
 //   고르기 중 줄 왼쪽 동그라미에 손가락을 대고 위아래로 끌기 · 또는 길게 눌러 고르기를 시작한 손가락을 떼지 않고 끌기
@@ -366,6 +602,8 @@ $('#selall').addEventListener('click', () => {
 });
 $('#seldel').addEventListener('click', () => 고름?.size && 지우기판());
 $('#selgroup').addEventListener('click', () => 고름?.size && 묶음넣기판());
+$('#selpdf').addEventListener('click', () => 고름?.size && 사진PDF판());
+$('#selcmp').addEventListener('click', () => { if (고름?.size !== 2) return; const 둘 = [...고름].map(id => 목록.find(d => d.id === id)).sort((a, b) => a.when - b.when); 견주기열기(둘[0], 둘[1]); });
 $('#selfav').addEventListener('click', () => {
   if (!고름?.size) return;
   const ids = [...고름], 뺌 = ids.every(id => 목록.find(d => d.id === id)?.즐겨);
@@ -390,6 +628,138 @@ function 더보기판(id) {
   $('#memoedit').onclick = () => 쪽지판(d);
   $('#favt').onclick = () => { 다리.setInfo(id, '즐겨', d.즐겨 ? '' : '1'); 판닫기(); 목록그리기(); };
 }
+
+// ②-1b 전체 찾기 (0.9.6 · 목업 1_읽을거리\여덟가지_목업.html ③ · 「처음 열 때 글 뽑아 둠」)
+//   첫 화면 머리 ⌕ → 찾기 칸 · 「이름에서」 「문서 속에서」(앞뒤 글 · 쪽) · 누르면 그 문서 그 쪽 + 문서 안 찾기 칸
+//   문서 속 글은 껍데기 saveText / loadText (갤럭시 files/text · 웹 보관함 · PC 는 창 안) — { v, 쪽: [쪽마다 글] } · { v, 글 } · { v, 없음: 까닭 }
+//   찾기를 열면 아직 안 뽑은 문서를 뒤에서 하나씩 · 문서를 열어도 그 문서를 뽑아 둠 · 인터넷 · AI 없음
+const 글뽑는형식 = ['txt', 'docx', 'hwpx', 'hwp', 'doc', 'xlsx', 'xls', 'html', 'htm', 'ppt'];
+const 글캐시 = new Map(), 뽑는중 = new Set();
+let 찾는중 = false, 준비 = null, 찾을쪽 = null, 찾을차례 = null, 찾기그림시계 = 0;
+const 글되는가 = d => { const e = String(d.ext || '').toLowerCase(); return e === 'pdf' || e === 'pptx' || 글뽑는형식.includes(e); };
+function 틀글(el) {                                       // 그린 문서 틀 → 글 (덩이 끝은 줄바꿈 · 표 칸은 탭)
+  let s = '';
+  const 걷기 = n => {
+    if (n.nodeType === 3) { s += n.nodeValue; return; }
+    if (n.nodeType !== 1) return;
+    const t = n.localName; if (t === 'script' || t === 'style') return;
+    if (t === 'br') { s += '\n'; return; }
+    for (const c of n.childNodes) 걷기(c);
+    if (/^(p|div|li|tr|h\d|table|section|article|pre|blockquote)$/.test(t)) s += '\n'; else if (t === 'td' || t === 'th') s += '\t';
+  };
+  걷기(el);
+  return s.replace(/[ \t]*\n\s*\n+/g, '\n\n');
+}
+async function 글뽑기(d) {
+  const ext = String(d.ext || '').toLowerCase();
+  if (ext === 'pdf' || ext === 'pptx') {
+    const 길 = ext === 'pdf' ? PDF길 : PPT길;
+    if (!길.글) return { v: 1, 없음: '판' };
+    const o = await 길.글(d.id);
+    return o.error ? { v: 1, 없음: o.error } : { v: 1, 쪽: o.pages };
+  }
+  if (!글뽑는형식.includes(ext)) return null;
+  const r = await fetch(문서주소(d)); if (!r.ok) return { v: 1, 없음: '원본 없음' };
+  const buf = await r.arrayBuffer();
+  let 글 = '';
+  try { const 결과 = await 문서[ext](buf); 글 = 틀글(결과.틀); 결과.틀.querySelectorAll('img[src^="blob:"]').forEach(i => URL.revokeObjectURL(i.src)); }
+  catch (e) { try { 글 = await 문서.글자만뽑기(ext, buf); } catch (e2) {} }
+  return { v: 1, 글: 글.slice(0, 2e6) };
+}
+async function 글읽기(d) {
+  if (글캐시.has(d.id)) return 글캐시.get(d.id);
+  let o = null; try { const j = await 다리.loadText?.(d.id); if (j) o = JSON.parse(j); } catch (e) {}
+  if (o) 글캐시.set(d.id, o);
+  return o;
+}
+async function 글적어두기(d, 기다림 = 1500) {              // 문서를 열면 그 문서 글을 뽑아 둠 (이미 있으면 그대로)
+  if (!다리.saveText || !글되는가(d) || 뽑는중.has(d.id) || await 글읽기(d)) return;
+  뽑는중.add(d.id);
+  try {
+    if (기다림) await new Promise(r => setTimeout(r, 기다림));
+    const o = await 글뽑기(d);
+    if (o) { 글캐시.set(d.id, o); await 다리.saveText(d.id, JSON.stringify(o)); }
+  } catch (e) { 글캐시.set(d.id, { v: 1, 없음: '깨짐' }); }
+  finally { 뽑는중.delete(d.id); }
+}
+async function 찾기준비() {                                  // 아직 안 뽑은 문서를 뒤에서 하나씩
+  if (준비) return;
+  준비 = { 됨: 0, 모두: 0 };
+  for (const d of 목록.filter(글되는가)) await 글읽기(d);
+  const 남은 = 목록.filter(d => 글되는가(d) && !글캐시.has(d.id));
+  준비.모두 = 남은.length;
+  for (const d of 남은) {
+    if (!찾는중) break;
+    await 글적어두기(d, 0); 준비.됨++;
+    if (찾는중) 찾기그리기();
+  }
+  준비 = null;
+  if (찾는중) 찾기그리기();
+}
+function 찾기열기() {
+  if (찾는중) return;
+  찾는중 = true; history.pushState({ v: '찾기' }, '');
+  $('#gq').value = ''; 목록그리기();
+  setTimeout(() => $('#gq').focus(), 60);
+  찾기준비();
+}
+function 찾기닫기전체() { 찾는중 = false; 목록그리기(); }
+function 찾기식(q) {                                       // 낱말 사이 빈칸 · 줄바꿈은 있든 없든 (PDF 는 글자마다 끊기는 일이 많음)
+  const 자 = [...q.replace(/\s+/g, '')].map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(자.join('\\s*'), 'gi');
+}
+function 문서속찾기(o, re) {
+  const 조각 = [], 쪽들 = o.쪽 || [o.글 || '']; let 수 = 0;
+  쪽들.forEach((t, p) => {
+    re.lastIndex = 0; let m;
+    while ((m = re.exec(t)) && 수 < 999) {
+      if (조각.length < 3) 조각.push({ p: o.쪽 ? p : null, k: 수, 비: m.index / Math.max(1, t.length), 앞: t.slice(Math.max(0, m.index - 24), m.index), 낱: m[0], 뒤: t.slice(m.index + m[0].length, m.index + m[0].length + 34) });
+      수++; if (!m[0].length) re.lastIndex++;
+    }
+  });
+  return { 수, 조각 };
+}
+function 찾기그리기() {
+  const q = $('#gq').value.trim(), L = $('#list');
+  const 준비글 = 준비?.모두 ? `<div class="찾기준비">문서 속 글 준비 중 ${준비.됨} / ${준비.모두} …</div>` : '';
+  if (!q) { L.innerHTML = `<div class="빈칸글">파일 이름 · 문서 속 글을 찾음<br><span class="흐림">PDF · 한글 · 워드 · 엑셀 · PPT · TXT</span></div>${준비글}`; return; }
+  const 한줄 = s => 글(String(s).replace(/\s+/g, ' '));
+  const 이름표시 = n => { const i = n.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? 글(n) : 글(n.slice(0, i)) + '<mark>' + 글(n.slice(i, i + q.length)) + '</mark>' + 글(n.slice(i + q.length)); };
+  const 낮 = q.toLowerCase().replace(/\s+/g, '');
+  const 이름들 = 목록.filter(d => String(d.name || '').toLowerCase().replace(/\s+/g, '').includes(낮));
+  const re = 찾기식(q), 속 = [];
+  for (const d of 목록) { const o = 글캐시.get(d.id); if (!o || o.없음) continue; const r = 문서속찾기(o, re); if (r.수) 속.push({ d, ...r }); }
+  const 줄머리 = d => { const ext = String(d.ext || '').toLowerCase(); return `<span class="badge b-${딱지(ext)}">${글((ext || '?').toUpperCase().slice(0, 4))}</span>`; };
+  let h = '';
+  if (이름들.length) h += `<div class="sec"><span>이름에서</span><span class="흐림">${이름들.length}</span></div><div class="묶음">` + 이름들.map(d => `<div class="item" data-id="${글(d.id)}" role="button">${줄머리(d)}<div class="t"><div class="n">${이름표시(d.name || '')}</div><div class="s">${글(d.from || '')} · ${때(d.when)}</div></div></div>`).join('') + '</div>';
+  if (속.length) {
+    const 곳 = 속.reduce((a, x) => a + x.수, 0);
+    h += `<div class="sec"><span>문서 속에서</span><span class="흐림">${곳 >= 999 ? '999+' : 곳}곳 · ${속.length}문서</span></div><div class="묶음">`;
+    for (const { d, 수, 조각 } of 속.sort((a, b) => b.수 - a.수)) {
+      const 단 = ['ppt', 'pptx'].includes(String(d.ext).toLowerCase()) ? '장' : '쪽';
+      h += `<div class="item" data-id="${글(d.id)}" role="button">${줄머리(d)}<div class="t"><div class="n">${글(d.name || '')}</div>`
+        + 조각.map(c => `<div class="찾은줄" data-id="${글(d.id)}" data-p="${c.p ?? ''}" data-k="${c.k}">…${한줄(c.앞)}<mark>${한줄(c.낱)}</mark>${한줄(c.뒤)}…<span class="쪽번">${c.p != null ? `${c.p + 1}${단}` : `${Math.round(c.비 * 100)}%`}</span></div>`).join('')
+        + (수 > 조각.length ? `<div class="찾은덧">외 ${수 - 조각.length}곳 → 열어서 ⌃⌄</div>` : '') + '</div></div>';
+    }
+    h += '</div>';
+  }
+  if (!h) h = `<div class="빈칸글">「${글(q)}」 없음</div>`;
+  const 못 = 목록.filter(d => !글되는가(d) || 글캐시.get(d.id)?.없음).length;
+  L.innerHTML = h + 준비글 + (못 ? `<div class="찾기준비">글을 못 찾는 문서 ${못}개 (그림 · 도면 · ZIP · 스캔 PDF${폰 ? ' · 안드로이드 15 아래 PDF' : ''}) → 이름으로만</div>` : '');
+}
+async function 찾아열기(id, q, p, k) {                       // 찾은 줄 → 그 문서 · 그 쪽 · 문서 안 찾기 칸 (그 곳부터)
+  열기(id, true);
+  for (let i = 0; i < 150 && !(지금?.id === id && 지금.자리됨); i++) await new Promise(r => setTimeout(r, 100));
+  if (지금?.id !== id || !지금.자리됨) return;
+  $('#resume').hidden = true;
+  if (p != null && 지금.쪽수) { 쪽으로(p); 찾을쪽 = p; } else 찾을차례 = k;
+  $('#vbar').hidden = true; $('#findbar').hidden = false; $('#fq').value = q;
+  찾기하기();
+}
+$('#gfind').addEventListener('click', 찾기열기);
+$('#gclose').addEventListener('click', () => (history.state?.v === '찾기' ? history.back() : 찾기닫기전체()));
+$('#gq').addEventListener('input', () => { clearTimeout(찾기그림시계); 찾기그림시계 = setTimeout(찾기그리기, 200); });
+$('#gq').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#gq').blur(); 찾기그리기(); } });
 
 // ②-2 문서 쪽지 (v0.6) — 문서마다 글 메모 하나 · 원본은 안 고침 · 껍데기 recent.json 줄의 「메모」 칸
 function 쪽지판(d) {
@@ -507,7 +877,7 @@ async function 도면열기(d) {
       목록, 레이어: 모음.레이어, 돌림: 지금.돌림,
       표시: () => 지금?.표시.쪽.d || [], 표시바뀜: 일 => 표시바꿈('d', 일), 돌림요청: 돌리기,
       재기바뀜: 재기글,
-      메모톡: (x, y) => 새메모('d', x, y), 그린뒤: () => 도면메모배치(), 글톡: 도면글톡,
+      메모톡: (x, y) => 새메모('d', x, y), 그린뒤: () => 도면메모배치(), 글톡: 도면글톡, 도장톡: 도면도장톡,
     });
     도면메모그리기();
     지금.단위 = { 1: 'in', 2: 'ft', 4: 'mm', 5: 'cm', 6: 'm' }[parseInt(모음.머리?.$INSUNITS?.[70], 10)] || '';
@@ -578,7 +948,7 @@ async function 글문서열기(d) {
     if (!안.textContent.trim() && !안.querySelector('img')) 알림('<b>글자가 없는 문서</b><div class="sm">그림만 든 문서일 수 있음</div>');
     도구보이기(['txt', 'xlsx', 'xls', 'ppt'].includes(지금.ext) ? ['find', 'size'] : 지금.ext === 'pptx' ? ['find', 'size', 'pptmode'] : ['find', 'size', 'plain']);
     if (지금.ext === 'pptx') 피피티모드글();
-    자리되살리기(); 책갈피단추();
+    자리되살리기(); 책갈피단추(); 글적어두기(d);
   } catch (e) {                                         // 모양을 못 그리면 글자만이라도
     let 글자 = '';
     try { 글자 = await 문서.글자만뽑기(지금.ext, buf); } catch (e2) {}
@@ -676,8 +1046,8 @@ function 찾기하기() {
       앞 = i + q.length; i = s.indexOf(소문자, 앞);
     }
   }
-  if (!찾은것.length) { $('#fcnt').textContent = '없음'; return; }
-  찾아가기(0);
+  if (!찾은것.length) { $('#fcnt').textContent = '없음'; 찾을차례 = null; return; }
+  찾아가기(찾을차례 != null ? Math.min(찾을차례, 찾은것.length - 1) : 0); 찾을차례 = null;   // 전체 찾기에서 고른 곳부터 (0.9.6)
 }
 function 찾아가기(k) {
   if (!찾은것.length) return;
@@ -708,14 +1078,14 @@ async function pdf찾기(q) {
   }
   for (const h of o.hits) {
     const 속 = $('#pages').children[h.p]?.querySelector('.속'); if (!속) continue;
-    찾은것.push(h.b.map(([l, t, r, b]) => {
+    찾은것.push(Object.assign(h.b.map(([l, t, r, b]) => {
       const e = document.createElement('div'); e.className = '찾은칸';
       Object.assign(e.style, { left: l * 100 + '%', top: t * 100 + '%', width: (r - l) * 100 + '%', height: (b - t) * 100 + '%' });
       속.insertBefore(e, 속.querySelector('svg.mk')); return e;
-    }));
+    }), { 쪽: h.p }));
   }
   찾은것.더 = o.more;
-  찾아가기(0);
+  찾아가기(찾을쪽 != null ? Math.max(0, 찾은것.findIndex(m => m.쪽 >= 찾을쪽)) : 0); 찾을쪽 = null;   // 전체 찾기에서 고른 쪽부터 (0.9.6)
 }
 $('#find').addEventListener('click', () => {
   $('#vbar').hidden = true; $('#findbar').hidden = false; $('#fcnt').textContent = '';
@@ -756,7 +1126,7 @@ async function pdf열기(d) {
   }, { root: $('#reader'), rootMargin: '1500px 0px' });
   틀.querySelectorAll('.pg').forEach(p => 지켜보기.observe(p));
   $('#reader').scrollTop = 0;
-  자리되살리기(); 책갈피단추();
+  자리되살리기(); 책갈피단추(); 글적어두기(d);
 }
 // 그릴 너비 — 옆으로 돌렸으면 쪽 틀의 «높이» 가 원래 쪽의 너비
 function 쪽너비(p) {
@@ -882,7 +1252,7 @@ function 획모양(획, W) {
 function 쪽표시그리기(p) {
   const svg = p.querySelector('svg.mk'), hl = p.querySelector('svg.hl'); if (!svg || !지금) return;
   const W = +p.dataset.pw, H = +p.dataset.ph, 획들 = 지금.표시.쪽[p.dataset.n] || [];
-  const 그림 = 획 => (획.t != null ? 글그림(획, W, H) : `<path d="${획경로(획, W, H)}" ${획모양(획, W)}/>`);
+  const 그림 = 획 => (도장인가(획) ? 도장그림(획, W, H) : 획.t != null ? 글그림(획, W, H) : `<path d="${획경로(획, W, H)}" ${획모양(획, W)}/>`);
   svg.innerHTML = 획들.filter(획 => !형광인가(획.c)).map(그림).join('') + 손잡이그림(p, 획들, W, H);
   if (hl) hl.innerHTML = 획들.filter(획 => 형광인가(획.c)).map(그림).join('');
 }
@@ -913,14 +1283,14 @@ function 긋기그림() {
 function 긋기이음(x, y) {
   if (!긋기 || 긋기.없음) return;
   if (긋기.지우개) return 쪽지우기(x, y);
-  if (긋기.도형새 || 긋기.고침 || 긋기.글새) return 도형이음(x, y);
+  if (긋기.도형새 || 긋기.고침 || 긋기.글새 || 긋기.도장새) return 도형이음(x, y);
   const q = 쪽좌표(긋기.p, x, y), a = 긋기.획.p, n = a.length;
   if (Math.hypot(q.x - a[n - 2], q.y - a[n - 1]) * 긋기.화소 < 1.5) return;
   a.push(네자리(q.x), 네자리(q.y)); 긋기.화면.push(x, y); 긋기그림();
 }
 function 긋기끝(버림) {
   const g = 긋기; 긋기 = null;
-  if (g?.고침 || g?.글새) return 도형끝(g, 버림);
+  if (g?.고침 || g?.글새 || g?.도장새) return 도형끝(g, 버림);
   if (!g?.획) return;
   if (버림) { g.path.remove(); return; }
   if (g.도형새) {                                     // 도형 — 12 화소보다 짧으면 버림 · 그린 것은 골라 둠 (끝 동그라미)
@@ -938,6 +1308,7 @@ function 쪽지우기(x, y) {                                  // 손가락 둘�
   for (const 획 of [...(지금.표시.쪽[p.dataset.n] || [])]) if (획닿음(획, q.x * W, q.y * H, W, H, 14 * W / q.화소)) 표시바꿈(p.dataset.n, { 뺌: 획 });
 }
 function 획닿음(획, X, Y, W, H, 둘레) {                  // X · Y · 둘레는 쪽 단위 (0~1 에 쪽 너비 · 높이를 곱한 값)
+  if (도장인가(획)) { const a = 획.a; return X > Math.min(a[0], a[2]) * W - 둘레 && X < Math.max(a[0], a[2]) * W + 둘레 && Y > Math.min(a[1], a[3]) * H - 둘레 && Y < Math.max(a[1], a[3]) * H + 둘레; }   // 도장 · 서명 — 상자 안 (0.9.6)
   if (획.t != null) { const [x0, y0, x1, y1] = 글상자(획.p[0] * W, 획.p[1] * H, 획.w * W, 획.t, 획.r || 0); return X > x0 - 둘레 && X < x1 + 둘레 && Y > y0 - 둘레 && Y < y1 + 둘레; }
   const s = []; for (let k = 0; k < 획.p.length; k += 2) s.push(획.p[k] * W, 획.p[k + 1] * H);
   return 선거리(s, X, Y) < 둘레 + 획.w * W / 2;
@@ -962,7 +1333,7 @@ function 글그림(획, W, H) {
   const X = 수(획.p[0] * W), Y = 수(획.p[1] * H), fs = 획.w * W;
   return `<text x="${X}" y="${Y}" font-size="${수(fs)}" font-weight="700" font-family="Pretendard, system-ui, sans-serif" dominant-baseline="hanging" fill="${색값(획.c)}" stroke="#fff" stroke-width="${수(fs * 0.14)}" stroke-linejoin="round" paint-order="stroke" transform="rotate(${-(획.r || 0) * 90} ${X} ${Y})">${글(획.t)}</text>`;
 }
-function 도형다시(획, W, H) { const a = 획.a; 획.p = 도형점(획.f, a[0] * W, a[1] * H, a[2] * W, a[3] * H, 획.w * W).map((v, k) => 네자리(k & 1 ? v / H : v / W)); }
+function 도형다시(획, W, H) { const a = 획.a; 획.p = 도형점(도장인가(획) ? 'r' : 획.f, a[0] * W, a[1] * H, a[2] * W, a[3] * H, 획.w * W).map((v, k) => 네자리(k & 1 ? v / H : v / W)); }
 function 도형잡기(pg, x, y) {
   // 고른 도형 : 끝 동그라미 → 그 끝 (크기) · 선 → 통째로 (옮김) / 「글」 : 쓴 글 → 옮김 · 톡하면 고치기
   // 안 고른 도형 선 → 후보 (톡이면 고르기만 · 끌면 새 도형 — 옆에서 그리다 남의 도형을 끄는 실수 막기)
@@ -985,6 +1356,10 @@ function 도형시작(p, x, y) {
     긋기 = { 고침: 획, 끝: 잡음.끝, p, q0: q, 옛: { p: [...획.p], ...(획.a ? { a: [...획.a] } : {}) }, 화면: [x, y], 움직임: false };
     return;
   }
+  if (도장모드()) {                                   // 도장 · 서명 — 찍은 것 위면 고르고 바로 끌어 옮길 수 있게 · 빈 곳 톡 = 찍기
+    if (잡음?.후보) { const 획 = 잡음.후보; 선택바꿈(획, p.dataset.n); 긋기 = { 고침: 획, 끝: null, p, q0: q, 옛: { p: [...획.p], a: [...획.a] }, 화면: [x, y], 움직임: false }; return; }
+    선택바꿈(null); 긋기 = { 도장새: true, p, q0: q, 화면: [x, y], 움직임: false }; return;
+  }
   선택바꿈(null);
   if (펜.도형 === 't') { 긋기 = { 글새: true, p, q0: q, 화면: [x, y], 움직임: false }; return; }
   const 점 = [네자리(q.x), 네자리(q.y)];
@@ -996,7 +1371,7 @@ function 도형시작(p, x, y) {
 function 도형이음(x, y) {
   const g = 긋기, W = +g.p.dataset.pw, H = +g.p.dataset.ph, q = 쪽좌표(g.p, x, y);
   if (Math.hypot(x - g.화면[0], y - g.화면[1]) > 8) g.움직임 = true;
-  if (g.글새) return;
+  if (g.글새 || g.도장새) return;
   if (g.도형새) { const 획 = g.획; 획.a[2] = 네자리(q.x); 획.a[3] = 네자리(q.y); 도형다시(획, W, H); g.끝화면 = [x, y]; return 긋기그림(); }
   if (!g.움직임) return;
   const 획 = g.고침, dx = q.x - g.q0.x, dy = q.y - g.q0.y;
@@ -1008,6 +1383,7 @@ function 도형이음(x, y) {
   쪽표시그리기(g.p);
 }
 function 도형끝(g, 버림) {
+  if (g.도장새) { if (!버림 && !g.움직임) 도장놓기(g.p, g.q0); return; }
   if (g.글새) { if (!버림 && !g.움직임) 글판(g.p.dataset.n, [네자리(g.q0.x), 네자리(g.q0.y)], null, g.q0.화소); return; }
   const 획 = g.고침;
   if (버림 || !g.움직임) {
@@ -1043,6 +1419,101 @@ function 글판(열쇠, 자리, 옛획, 단위) {
   칸.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); 넣기(); } };
   setTimeout(() => { 칸.focus(); 칸.setSelectionRange(칸.value.length, 칸.value.length); }, 60);
 }
+// ④-3c 도장 · 서명 (0.9.6 ⑫) — 펜 판 「도장」 → 위 줄에서 고르고 톡 · 이름 · 서명은 이 폰에만 (localStorage 「도장설정」 · 「도장서명」)
+const 도장모드 = () => 펜.도형 === 's' || 펜.도형 === 'g';
+function 도장설정() { try { return Object.assign({ 이름: '', 글들: ['검토필', '확인'] }, JSON.parse(localStorage.getItem('도장설정') || '{}')); } catch (e) { return { 이름: '', 글들: ['검토필', '확인'] }; } }
+function 도장설정저장(o) { try { localStorage.setItem('도장설정', JSON.stringify(o)); } catch (e) {} }
+function 서명읽기() { try { return JSON.parse(localStorage.getItem('도장서명') || 'null'); } catch (e) { return null; } }
+const 오늘글 = () => { const d = new Date(); return `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, '0')}. ${String(d.getDate()).padStart(2, '0')}`; };
+function 도장획() {
+  if (펜.도형 === 'g') return { c: 'k', f: 'g', 획: 서명읽기()?.획 || [] };
+  return { c: 'r', f: 's', s: 펜.도장글 || '검토필', 날: 오늘글(), 이름: 도장설정().이름 || '' };
+}
+const 도장크기 = () => (펜.도형 === 'g' ? [150, 60] : [120, 78]);      // 화면 화소 (가로 · 세로)
+function 도장놓기(pg, q) {
+  const W = +pg.dataset.pw, H = +pg.dataset.ph, [bw, bh] = 도장크기(), 돌 = 지금.돌림, [uw, uh] = 돌 & 1 ? [bh, bw] : [bw, bh];
+  const nx = uw / q.화소 / 2, ny = uh * W / (q.화소 * H) / 2;
+  const 획 = 도장획(); 획.a = [q.x - nx, q.y - ny, q.x + nx, q.y + ny].map(네자리); 획.r = 돌; 획.w = +(3 / q.화소).toPrecision(4);
+  도형다시(획, W, H);
+  선택바꿈(획, pg.dataset.n); 표시바꿈(pg.dataset.n, { 더함: 획 });
+}
+function 도면도장톡(x, y, 배) {
+  const [bw, bh] = 도장크기(), 돌 = 지금.돌림, [uw, uh] = (돌 & 1 ? [bh, bw] : [bw, bh]).map(v => v / 배 / 2);
+  const 획 = 도장획(); 획.a = [x - uw, y - uh, x + uw, y + uh].map(v => +v.toPrecision(9)); 획.r = 돌; 획.w = 3 / 배;
+  획.p = 도형점('r', ...획.a, 획.w).map(v => +v.toPrecision(9));
+  표시바꿈('d', { 더함: 획 });
+}
+function 도장그림(획, W, H) {                               // 쪽 svg — 도장캔버스(pen.js)와 같은 모양
+  const a = 획.a, x0 = Math.min(a[0], a[2]) * W, x1 = Math.max(a[0], a[2]) * W, y0 = Math.min(a[1], a[3]) * H, y1 = Math.max(a[1], a[3]) * H;
+  const cx = 수((x0 + x1) / 2), cy = 수((y0 + y1) / 2), r = 획.r || 0;
+  let w = x1 - x0, h = y1 - y0; if (r & 1) [w, h] = [h, w];
+  let 속 = '';
+  if (획.f === 's') {
+    const 굵 = Math.max(0.5, h * 0.045);
+    속 = `<rect x="${수(cx - w / 2 + 굵 / 2)}" y="${수(cy - h / 2 + 굵 / 2)}" width="${수(w - 굵)}" height="${수(h - 굵)}" rx="${수(h * 0.08)}" fill="rgba(255,255,255,.35)" stroke="#d6262b" stroke-width="${수(굵)}"/>`
+      + 도장줄(획, w, h).map(z => `<text x="${cx}" y="${수(cy + z.y)}" font-size="${수(z.크기)}" font-weight="${z.굵}" text-anchor="middle" dominant-baseline="central" fill="#d6262b" font-family="Pretendard, system-ui, sans-serif">${글(z.글)}</text>`).join('');
+  } else {
+    속 = (획.획 || []).map(s => { let d = ''; for (let k = 0; k < s.length; k += 2) d += `${k ? 'L' : 'M'}${수(cx - w / 2 + s[k] * w)} ${수(cy - h / 2 + s[k + 1] * h)}`; if (s.length === 2) d += 'l0.01 0'; return `<path d="${d}" fill="none" stroke="${색값('k')}" stroke-width="${수(Math.max(0.5, h * 0.045))}" stroke-linecap="round" stroke-linejoin="round"/>`; }).join('');
+  }
+  return `<g transform="rotate(${-r * 90} ${cx} ${cy})">${속}</g>`;
+}
+function 도장줄그리기() {
+  const 설 = 도장설정(), 서명 = 서명읽기();
+  $('#stampbar').innerHTML = 설.글들.map(t => `<button data-s="${글(t)}" class="${펜.도형 === 's' && 펜.도장글 === t ? 'on' : ''}"><span class="도장꼴">${글(t)}</span></button>`).join('')
+    + `<button data-g class="${펜.도형 === 'g' ? 'on' : ''}"><span class="서명꼴">${서명 ? '서명' : '서명 그리기'}</span></button><button data-new>＋ 도장 · 이름</button>`;
+}
+$('#stampbar').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.hasAttribute('data-new')) return 도장설정판();
+  if (b.hasAttribute('data-g')) { if (!서명읽기()) return 서명판(() => 도장고름('g')); return 도장고름('g'); }
+  const t = b.dataset.s; if (!도장설정().이름) return 도장설정판(() => 도장고름('s', t), true);
+  도장고름('s', t);
+});
+function 도장고름(f, t) {
+  펜.도형 = f; if (t) 펜.도장글 = t; 펜.지우개 = false; 펜.메모 = false;
+  if (도형선택) 선택바꿈(null);
+  칩(f === 'g' ? '서명 찍을 곳을 톡' : `「${t}」 찍을 곳을 톡 · 찍은 것은 끌어 옮김`);
+  도면판?.펜({ ...펜 }); 펜판갱신();
+}
+function 도장설정판(다음, 이름먼저) {
+  const 설 = 도장설정();
+  판열기(`<h3>${이름먼저 ? '도장에 넣을 이름' : '도장 · 이름 · 서명'} <span class="흐림">· 이 폰에만 저장</span></h3>
+    <div class="opt"><span class="lab">이름</span><input id="stname" type="text" maxlength="12" placeholder="예 : 홍길동" style="flex:1"></div>
+    ${이름먼저 ? '' : `<div class="도장목록" id="stlist">${설.글들.map((t, k) => `<span>${글(t)}<button data-k="${k}" aria-label="빼기">×</button></span>`).join('')}</div>
+    <div class="row"><input id="stnew" type="text" maxlength="8" placeholder="새 도장 글 (예 : 보완 필요)" enterkeyhint="done"></div>
+    <button class="act" id="stsign">✍ 서명 ${서명읽기() ? '다시 그리기' : '그리기'}</button>`}
+    <div class="row 끝줄"><span style="flex:1"></span><button class="btn plain" onclick="판닫기()">닫기</button><button class="btn" id="stok">저장</button></div>
+    <div class="판설명">도장 = 글 · 오늘 날짜 · 이름 · 원본은 안 고침 · 전자서명 아님 (보기 표시)</div>`);
+  $('#stname').value = 설.이름 || '';
+  $('#stlist')?.addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; 설.글들.splice(+b.dataset.k, 1); b.parentElement.remove(); $('#stlist').querySelectorAll('[data-k]').forEach((x, k) => (x.dataset.k = k)); });
+  if ($('#stsign')) $('#stsign').onclick = () => { 설.이름 = $('#stname').value.trim(); 도장설정저장(설); 서명판(() => 도장고름('g')); };
+  $('#stok').onclick = () => {
+    설.이름 = $('#stname').value.replace(/\s+/g, ' ').trim();
+    const 새 = $('#stnew')?.value.replace(/\s+/g, ' ').trim(); if (새 && !설.글들.includes(새)) 설.글들.push(새);
+    if (!설.글들.length) 설.글들 = ['검토필'];
+    if (이름먼저 && !설.이름) return $('#stname').focus();
+    도장설정저장(설); 판닫기(); 도장줄그리기(); 다음?.();
+  };
+  setTimeout(() => $('#stname').focus(), 60);
+}
+function 서명판(다음) {                                    // 한 번 그려 이 폰에 저장 — 0~1 선들
+  판열기(`<h3>서명 그리기 <span class="흐림">· 이 폰에만 저장</span></h3><canvas class="서명판" id="signpad"></canvas>
+    <div class="row 끝줄"><button class="btn plain" id="signclear">지우고 다시</button><span style="flex:1"></span><button class="btn plain" onclick="판닫기()">닫기</button><button class="btn" id="signok">저장</button></div>`);
+  const c = $('#signpad'), 선들 = []; let 지금선 = null;
+  const 맞춤 = () => { const r = c.getBoundingClientRect(), d = devicePixelRatio || 1; c.width = Math.round(r.width * d); c.height = Math.round(r.height * d); 그림(); };
+  const 그림 = () => {
+    const x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height);
+    x.strokeStyle = '#1b1f24'; x.lineWidth = c.height * 0.035; x.lineCap = 'round'; x.lineJoin = 'round';
+    for (const s of 선들) { x.beginPath(); for (let k = 0; k < s.length; k += 2) { const X = s[k] * c.width, Y = s[k + 1] * c.height; if (k) x.lineTo(X, Y); else x.moveTo(X, Y); } if (s.length === 2) x.lineTo(s[0] * c.width + 0.5, s[1] * c.height); x.stroke(); }
+  };
+  const 점 = e => { const r = c.getBoundingClientRect(); return [네자리(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))), 네자리(Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)))]; };
+  c.onpointerdown = e => { try { c.setPointerCapture(e.pointerId); } catch (x) {} 지금선 = 점(e); 선들.push(지금선); 그림(); };
+  c.onpointermove = e => { if (!지금선) return; 지금선.push(...점(e)); 그림(); };
+  c.onpointerup = c.onpointercancel = () => { 지금선 = null; };
+  $('#signclear').onclick = () => { 선들.length = 0; 그림(); };
+  $('#signok').onclick = () => { if (!선들.length) return; try { localStorage.setItem('도장서명', JSON.stringify({ 획: 선들 })); } catch (e) {} 판닫기(); 도장줄그리기(); 다음?.(); };
+  setTimeout(맞춤, 30);
+}
 function 도면글톡(x, y, 배) {                              // 도면 — 「글」 로 톡 : 쓴 글 위면 고치기 · 빈 곳이면 새 글
   const 찾음 = [...(지금.표시.쪽.d || [])].reverse().find(획 => {
     if (획.t == null) return false;
@@ -1056,8 +1527,10 @@ function 펜판갱신() {
   if (!펜.켬) $('#penpal').hidden = true;
   $('#pen').classList.toggle('on', 펜.켬);
   const 형광 = 형광인가(펜.색);
-  for (const b of $('#penbar').querySelectorAll('[data-m]')) b.classList.toggle('on', 펜.메모 ? b.dataset.m === '메모' : 펜.도형 ? b.dataset.m === '도형' : !펜.지우개 && !['메모', '도형'].includes(b.dataset.m) && (b.dataset.m === '형광') === 형광);
-  $('#shapebar').hidden = !펜.켬 || !펜.도형;
+  for (const b of $('#penbar').querySelectorAll('[data-m]')) b.classList.toggle('on', 펜.메모 ? b.dataset.m === '메모' : 펜.도형 ? b.dataset.m === (도장모드() ? '도장' : '도형') : !펜.지우개 && !['메모', '도형', '도장'].includes(b.dataset.m) && (b.dataset.m === '형광') === 형광);
+  $('#shapebar').hidden = !펜.켬 || !펜.도형 || 도장모드();
+  if ($('#stampbar').hidden !== !(펜.켬 && 도장모드())) { $('#stampbar').hidden = !(펜.켬 && 도장모드()); if (!$('#stampbar').hidden) 도장줄그리기(); }
+  else if (!$('#stampbar').hidden) 도장줄그리기();
   for (const b of $('#shapebar').querySelectorAll('[data-f]')) b.classList.toggle('on', b.dataset.f === 펜.도형);
   $('#penbar').classList.toggle('메모중', !!펜.메모);
   $('#pencolordot').style.background = 색값(펜.색);
@@ -1092,7 +1565,12 @@ $('#penbar').addEventListener('click', e => {
     펜.메모 = true; 펜.도형 = null; 펜.지우개 = false; $('#penpal').hidden = true; 긋기 = null;
     칩('메모 넣을 곳을 톡 · 쪽지는 끌어 옮김');
   }
+  else if (b.dataset.m === '도장') {                  // 도장 · 서명 (0.9.6) — 위 줄에서 고르고 톡
+    $('#penpal').hidden = true; 긋기 = null;
+    if (!도장모드()) { const t = 펜.도장글 || 도장설정().글들[0] || '검토필'; if (!도장설정().이름) { 펜.도형 = 's'; 펜.도장글 = t; 펜판갱신(); return 도장설정판(() => 도장고름('s', t), true); } return 도장고름('s', t); }
+  }
   else if (b.dataset.m === '도형') {                  // 도형 (0.9.4) — 위에 작은 줄 · 색은 펜 색
+    if (도장모드()) 펜.도형 = null;
     펜.도형 = 펜.도형 || 마지막도형; 펜.메모 = false; 펜.지우개 = false; $('#penpal').hidden = true; 긋기 = null;
     if (형광인가(펜.색)) { 펜.색 = 펜.펜색; 펜설정저장(); }
     칩(펜.도형 === 't' ? '글 넣을 곳을 톡' : '끌어서 그림 · 그린 것은 톡 → 옮기기 · 크기');
@@ -1551,6 +2029,8 @@ window.addEventListener('popstate', () => {
     if (!$('#sheet').hidden) { 판닫기(); history.pushState({ v: '고르기' }, ''); return; }
     고름 = null; return 목록그리기();
   }
+  if (!$('#cmpview').hidden) { 판닫기(); return 견닫기(); }      // 두 판 견주기에서 뒤로 (0.9.6)
+  if (찾는중 && $('#viewer').hidden && history.state?.v !== '찾기') { 판닫기(); return 찾기닫기전체(); }   // 전체 찾기 화면에서 뒤로 (0.9.6)
   if (압축보기.뒤로()) return;                       // ZIP 폴더 · ZIP 에서 꺼내 연 문서 (10-04 · zipview.js)
   if (!$('#thumbs').hidden || (history.state?.v === 'viewer' && 지금)) { 쪽목록닫기(); 판닫기(); return; }   // 쪽 목록에서 뒤로 → 보기 화면
   if (!$('#sheet').hidden) { 판닫기(); if (지금) history.pushState({ v: 'viewer', 깊이: 지금.깊이 }, ''); return; }

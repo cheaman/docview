@@ -205,7 +205,7 @@ mark.cur { background:#ff9f2e; }
 .penbar::-webkit-scrollbar { display:none; }
 .chip { white-space:nowrap; }
 body:has(#viewer:not([hidden]) #penbar:not([hidden])) .chip { bottom:calc(140px + env(safe-area-inset-bottom)); }   /* 칩이 body 로 나감 (0.9.3) */
-body:has(#viewer:not([hidden]) #shapebar:not([hidden])) .chip { bottom:calc(206px + env(safe-area-inset-bottom)); }
+body:has(#viewer:not([hidden]) #shapebar:not([hidden])) .chip, body:has(#viewer:not([hidden]) #stampbar:not([hidden])) .chip { bottom:calc(206px + env(safe-area-inset-bottom)); }
 .penbar .펜색 { width:38px; height:38px; border-radius:50%; display:grid; place-items:center; flex:none; }
 .penbar .펜색 i { width:24px; height:24px; border-radius:50%; display:block; box-shadow:inset 0 0 0 2px rgba(0,0,0,.12); }
 .penbar .펜색.on { background:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent); }
@@ -391,3 +391,45 @@ i.형광점 { border-radius:7px !important; }
 .pages { margin:0 auto; }   /* 1배 아래로 줄이면 가운데 (10-05) */
 .고름칸 { position:relative; }
 .고름칸::before { content:''; position:absolute; inset:-14px -12px; }   /* 문질러 고르기 — 동그라미 손가락 자리를 넓게 (10-05) */
+
+/* ── 0.9.6 ③ 전체 찾기 — 첫 화면 ⌕ · 이름에서 · 문서 속에서 ── */
+.찾기단추 { display:grid; place-items:center; padding:7px 10px !important; }
+.찾기단추 .ico { width:18px; height:18px; }
+.item .n mark, .찾은줄 mark { background:#ffe066; color:#1d1d1f; border-radius:3px; padding:0 1px; }
+.찾은줄 { font-size:13px; color:var(--sub); line-height:1.55; margin-top:5px; padding:4px 8px; border-radius:8px; background:var(--surface2); word-break:break-all; }
+.찾은줄:active { background:var(--accent-soft); }
+.찾은줄 .쪽번 { font-size:12px; font-weight:700; color:var(--accent-ink); margin-left:6px; white-space:nowrap; }
+.찾은덧 { font-size:12px; color:var(--faint); margin-top:4px; }
+.찾기준비 { font-size:13px; color:var(--sub); text-align:center; padding:12px 0 4px; }
+.item:has(.찾은줄) { align-items:flex-start; }
+
+/* ── 0.9.6 ④ 사진 여러 장 → PDF 한 권 ── */
+.selfoot .새것 { background:var(--accent); color:var(--on-accent); }
+.pdf썸들 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:4px 0 6px; max-height:38vh; overflow-y:auto; }
+.pdf썸 { position:relative; aspect-ratio:3/4; border-radius:8px; overflow:hidden; background:var(--surface2); touch-action:none; user-select:none; -webkit-user-select:none; }
+.pdf썸 img { width:100%; height:100%; object-fit:cover; pointer-events:none; -webkit-user-drag:none; }
+.pdf썸 b { position:absolute; left:4px; top:4px; min-width:20px; height:20px; padding:0 5px; border-radius:10px; background:var(--accent); color:#fff; font-size:12px; display:grid; place-items:center; }
+.pdf썸.끄는중 { outline:3px solid var(--accent); transform:scale(1.05); z-index:1; box-shadow:0 6px 16px rgba(0,0,0,.25); }
+
+/* ── 0.9.6 ⑫ 검토 도장 · 손 서명 ── */
+.도장줄 { justify-content:flex-start; overflow-x:auto; scrollbar-width:none; padding:8px 10px 4px; }
+.도장줄::-webkit-scrollbar { display:none; }
+.도장줄 button { flex:none; min-width:0; padding:8px 12px; flex-direction:row; font-weight:700; }
+.도장줄 .도장꼴 { color:#d6262b; border:2px solid #d6262b; border-radius:6px; padding:2px 7px; font-size:13px; background:rgba(255,255,255,.5); }
+.도장줄 .서명꼴 { font-style:italic; font-family:cursive, serif; font-size:15px; }
+.서명판 { width:100%; aspect-ratio:5/2; border-radius:12px; background:#fff; border:1px dashed var(--faint); touch-action:none; display:block; }
+.도장목록 { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+.도장목록 span { display:inline-flex; align-items:center; gap:4px; color:#d6262b; border:2px solid #d6262b; border-radius:6px; padding:2px 4px 2px 8px; font-weight:700; font-size:14px; }
+.도장목록 button { color:var(--sub); font-size:16px; padding:0 4px; }
+
+/* ── 0.9.6 ⑪ 두 판 견주기 ── */
+.cmpview { background:var(--reader); z-index:5; }
+.cmpbox { flex:1; overflow:auto; position:relative; -webkit-overflow-scrolling:touch; }
+.cmpbox canvas { display:block; width:100%; height:auto; background:#fff; margin:0 auto; }
+.cmpbox.크게 canvas { width:200%; }
+.cmp알림 { position:absolute; left:50%; top:40%; transform:translate(-50%,-50%); background:rgba(20,22,26,.86); color:#fff; padding:10px 16px; border-radius:14px; font-size:14px; text-align:center; white-space:pre-line; }
+.cmpfoot { flex:none; display:flex; align-items:center; gap:6px; padding:8px 8px calc(10px + env(safe-area-inset-bottom)); background:var(--bar); border-top:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+.cmpfoot .pb { font-size:15px; padding:8px 10px; border-radius:999px; color:var(--bar-text); flex:none; }
+.cmpfoot .seg { flex:none; }
+.cmp쪽 { font-size:13px; color:var(--bar-text); min-width:64px; text-align:center; flex:none; }
+.cmpfoot .seg button { white-space:nowrap; }

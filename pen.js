@@ -60,3 +60,34 @@ function 글상자(X, Y, fs, 글, r) {
   const tw = Math.max(1, [...String(글)].reduce((s, ch) => s + (ch.charCodeAt(0) > 255 ? 1 : 0.6), 0)) * fs, th = fs * 1.25;
   return r === 1 ? [X, Y - tw, X + th, Y] : r === 2 ? [X - tw, Y - th, X, Y] : r === 3 ? [X - th, Y, X, Y + tw] : [X, Y, X + tw, Y + th];
 }
+
+// 도장 · 서명 (0.9.6 ⑫ · 목업 여덟가지_목업.html) — 획 f = 's'(도장 : s 글 · 날 · 이름) · 'g'(서명 : 획 = 0~1 선들) · a = 상자 두 점 · r = 찍을 때 돌림
+//   이름 · 서명 그림은 폰에만 (localStorage) — 앱 코드에는 없음 · 전자서명 아님 (보기 표시)
+const 도장인가 = 획 => 획.f === 's' || 획.f === 'g';
+const 글폭 = s => [...String(s)].reduce((a, ch) => a + (ch.charCodeAt(0) > 255 ? 1 : 0.58), 0);
+function 도장줄(획, w, h) {                                // 상자 가운데 기준 줄들 [{ 글, 크기, 굵, y }]
+  const 줄 = [획.s, 획.날, 획.이름].filter(Boolean), n = 줄.length || 1, 기본 = h / (n * 1.4 + 0.3);
+  return 줄.map((s, k) => ({ 글: s, 크기: Math.min(기본 * (k === 0 ? 1.12 : 0.86), w * 0.84 / Math.max(1, 글폭(s))), 굵: k === 0 ? 800 : 700, y: (k - (n - 1) / 2) * 기본 * 1.4 }));
+}
+function 도장캔버스(g, 획, x0, y0, x1, y1, 어둠) {          // 상자 = 화면 꼴(아래로 커짐) 화소
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, r = 획.r || 0;
+  let w = Math.abs(x1 - x0), h = Math.abs(y1 - y0); if (r & 1) [w, h] = [h, w];
+  g.save(); g.translate(cx, cy); g.rotate(-r * Math.PI / 2);
+  if (획.f === 's') {
+    const 빨 = '#d6262b', 굵 = Math.max(1, h * 0.045);
+    g.fillStyle = 어둠 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.35)'; g.strokeStyle = 빨;   // 검은 바탕 도면은 흰 속 g.lineWidth = 굵;
+    g.beginPath(); if (g.roundRect) g.roundRect(-w / 2 + 굵 / 2, -h / 2 + 굵 / 2, w - 굵, h - 굵, h * 0.08); else g.rect(-w / 2 + 굵 / 2, -h / 2 + 굵 / 2, w - 굵, h - 굵);
+    g.fill(); g.stroke();
+    g.fillStyle = 빨; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const z of 도장줄(획, w, h)) { g.font = `${z.굵} ${z.크기}px Pretendard, system-ui, sans-serif`; g.fillText(z.글, 0, z.y); }
+  } else {
+    g.strokeStyle = 색값('k', 어둠); g.lineWidth = Math.max(1, h * 0.045); g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const s of 획.획 || []) {
+      g.beginPath();
+      for (let k = 0; k < s.length; k += 2) { const X = -w / 2 + s[k] * w, Y = -h / 2 + s[k + 1] * h; if (k) g.lineTo(X, Y); else g.moveTo(X, Y); }
+      if (s.length === 2) g.lineTo(-w / 2 + s[0] * w + 0.01, -h / 2 + s[1] * h);
+      g.stroke();
+    }
+  }
+  g.restore();
+}

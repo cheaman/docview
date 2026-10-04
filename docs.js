@@ -146,7 +146,7 @@ const 크기em = (pt, 기본) => Math.min(1.8, Math.max(0.7, pt / 기본)).toFix
   const body = 후손(본문, 'body')[0];
   if (!body) throw new Error('본문(body) 없음');
   await 덩이들(body, 틀);
-  return { 틀, 알림: 그림없음 ? `그림 ${그림없음}개는 못 그림 (EMF · WMF)` : null };
+  return { 틀, 알림: 그림없음 ? `그림 ${그림없음}개는 못 그림` : null };
 };
 
 // ④ 한글 (HWPX) ───────────────────────────────────

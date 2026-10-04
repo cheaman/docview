@@ -10,7 +10,7 @@
 //   ⑧ PPT길 — app.js 의 PDF 길과 같은 꼴 { 정보, 쪽, 찾기, 놓기 } → PDF 와 같은 화면 (펜 · 돌리기 · 쪽 목록 · 보내기)
 //   ⑨ 글로 (나) — 문서.pptx (docs.js 꼴) · 장마다 제목 · 글 · 그림 · 표 · 발표자 메모
 //   ⑩ 옛 PPT — 문서.ppt · 복합 문서(cfb.js) 안 「PowerPoint Document」 의 글 조각만
-// 못 그리는 것 : 옛 그림 형식(EMF · WMF) · 차트 · 스마트아트 → 회색 칸 · 애니메이션 · 동영상 · 그림자
+// 못 그리는 것 : TIFF · 차트 · 스마트아트 → 회색 칸 · 애니메이션 · 동영상 · 그림자 (EMF · WMF 는 0.9.6 부터 meta.js 로 그림)
 'use strict';
 const 피피티 = (() => {
   const EMU = 12700;                                   // 1pt
@@ -537,8 +537,11 @@ const 피피티 = (() => {
     if (문.그림들.has(p)) { const v = 문.그림들.get(p); 문.그림들.delete(p); 문.그림들.set(p, v); return v; }
     const 약속 = (async () => {
       const ext = (p.split('.').pop() || '').toLowerCase();
-      if (['emf', 'wmf', 'tif', 'tiff', 'wdp', 'jxr'].includes(ext)) return { 못: ext.toUpperCase() };
+      if (['tif', 'tiff', 'wdp', 'jxr'].includes(ext)) return { 못: ext.toUpperCase() };
       const b = await 문.z.바이트(p).catch(() => null); if (!b) return { 못: '없음' };
+      if (ext === 'emf' || ext === 'wmf') {                             // 캐드 단면도 등 옛 그림 → meta.js (0.9.6)
+        try { const c = 메타그림.캔버스(b, 2048); return { im: c, w: c.width, h: c.height }; } catch (e) { return { 못: ext.toUpperCase() }; }
+      }
       const u = URL.createObjectURL(new Blob([b], { type: { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp', svg: 'image/svg+xml', webp: 'image/webp' }[ext] || '' }));
       try {
         const im = await new Promise((ok, no) => { const i = new Image(); i.decoding = 'async'; i.onload = () => ok(i); i.onerror = () => no(); i.src = u; });
@@ -786,6 +789,12 @@ const 피피티 = (() => {
       return URL.createObjectURL(b);
     }),
     놓기: u => { if (typeof u === 'string' && u.startsWith('blob:')) URL.revokeObjectURL(u); },
+    // 장마다 글 (0.9.6 · 전체 찾기)
+    async 글(id) {
+      const 문 = await 덱(id), pages = [];
+      for (let i = 0; i < 문.장들.length; i++) { const 준 = await 장준비(문, i); pages.push([...준.s.x.getElementsByTagNameNS('*', 'txBody')].flatMap(문단글).join('\n')); }
+      return { pages };
+    },
     // 찾기 — 빈칸 빼고 견줌 · 찾은 글 상자를 칠함 (장 안 0~1)
     async 찾기(id, q) {
       const 문 = await 덱(id), 낱 = q.replace(/\s+/g, '').toLowerCase();
@@ -829,10 +838,11 @@ const 피피티 = (() => {
         if (모.종류 === 'pic' || (모.종류 === 'graphicFrame' && 아래(e, 'blip') && !아래(e, 'tbl'))) {
           const blip = 아래(e, 'blip'), p = 준.s.r.get(blip?.getAttributeNS(R, 'embed'))?.길;
           const ext = (p || '').split('.').pop().toLowerCase();
-          if (!p || ['emf', 'wmf', 'tif', 'tiff'].includes(ext)) { 못그림++; continue; }
+          if (!p || ['tif', 'tiff'].includes(ext)) { 못그림++; continue; }
           const b = await 문.z.바이트(p).catch(() => null); if (!b) continue;
           const im = 만('img', '그림'); im.alt = ''; im.loading = 'lazy';
-          im.src = URL.createObjectURL(new Blob([b], { type: ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg' }));
+          if (ext === 'emf' || ext === 'wmf') { const u = await 메타그림.주소(b).catch(() => null); if (!u) { 못그림++; continue; } im.src = u; }   // 0.9.6
+          else im.src = URL.createObjectURL(new Blob([b], { type: ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : 'image/jpeg' }));
           틀.append(im); 그림수++; continue;
         }
         if (모.종류 === 'graphicFrame') {
@@ -880,7 +890,7 @@ const 피피티 = (() => {
         if (글) 틀.append(만('div', 'ppt메모', '발표자 메모 — ' + 글));
       }
     }
-    return { 틀, 덧: `${문.장들.length}장 · 글로`, 알림: 못그림 ? `그림 ${못그림}개는 옛 형식(EMF · WMF)이라 못 보임` : null };
+    return { 틀, 덧: `${문.장들.length}장 · 글로`, 알림: 못그림 ? `그림 ${못그림}개는 못 그림 (TIFF 등)` : null };
   }
 
   // ⑩ 옛 PPT ──────────────────────────────────────

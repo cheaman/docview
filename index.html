@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta name="docview-ver" content="1005-061735">
+<meta name="docview-ver" content="1005-064841">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <link rel="stylesheet" href="app.css">
@@ -54,8 +54,9 @@
 
 <!-- ③-① 최근 목록 -->
 <section id="home" class="view">
-  <header class="bar" id="homebar"><span class="dsm-mark" aria-hidden="true"><b>DSM</b><i><u></u><u></u><u></u><u></u></i></span><h1>문서 보기</h1><button class="tovideo" id="selbtn">고르기</button><a class="tovideo" href="video/index.html">🎬 영상</a></header>
+  <header class="bar" id="homebar"><span class="dsm-mark" aria-hidden="true"><b>DSM</b><i><u></u><u></u><u></u><u></u></i></span><h1>문서 보기</h1><button class="tovideo 찾기단추" id="gfind" aria-label="전체 찾기"><svg class="ico"><use href="#i-find"/></svg></button><button class="tovideo" id="selbtn">고르기</button><a class="tovideo" href="video/index.html">🎬 영상</a></header>
   <header class="bar" id="selbar" hidden><h1 id="selcnt">0개 고름</h1><button class="tovideo" id="selall">다 고르기</button><button class="tovideo" id="seldone">끝</button></header>
+  <header class="bar findbar" id="gbar" hidden><button class="ib" id="gclose" aria-label="찾기 닫기"><svg class="ico"><use href="#i-back"/></svg></button><label class="field"><svg class="ico"><use href="#i-find"/></svg><input id="gq" type="search" placeholder="파일 이름 · 문서 속 글" enterkeyhint="search" autocomplete="off"></label></header>
   <div id="kinds" class="칩줄" hidden></div>
   <main id="list" class="list"></main>
   <div id="empty" class="empty" hidden>
@@ -68,7 +69,7 @@
     </div>
   </div>
   <button id="pick" class="fab"><svg class="ico"><use href="#i-open"/></svg>파일 열기</button>
-  <div id="selfoot" class="selfoot" hidden><button id="selfav">⭐ 즐겨찾기</button><button id="selgroup">🏷 묶음</button><button id="seldel" class="지움">지우기</button></div>
+  <div id="selfoot" class="selfoot" hidden><button id="selpdf" class="새것" hidden>📄 PDF 로</button><button id="selcmp" class="새것" hidden>⇄ 견주기</button><button id="selfav">⭐ 즐겨찾기</button><button id="selgroup">🏷 묶음</button><button id="seldel" class="지움">지우기</button></div>
   <div class="서명" id="sign">DSM · 34 문서보기</div>
 </section>
 
@@ -96,8 +97,9 @@
   <div id="resume" class="이어봄" hidden><span id="resumetext"></span><button id="resumetop">처음부터</button></div>
   <div id="penpal" class="penpal" hidden></div>
   <div id="shapebar" class="shapebar" hidden><button data-f="a"><svg class="ico"><use href="#i-arrow"/></svg>화살표</button><button data-f="r"><svg class="ico"><use href="#i-box"/></svg>네모</button><button data-f="o"><svg class="ico"><use href="#i-oval"/></svg>동그라미</button><button data-f="t"><svg class="ico"><use href="#i-text"/></svg>글</button></div>
+  <div id="stampbar" class="shapebar 도장줄" hidden></div>
   <div id="penbar" class="penbar" hidden>
-    <div class="펜종류"><button data-m="펜">펜</button><button data-m="형광">형광</button><button data-m="메모">메모</button><button data-m="도형">도형</button></div>
+    <div class="펜종류"><button data-m="펜">펜</button><button data-m="형광">형광</button><button data-m="메모">메모</button><button data-m="도형">도형</button><button data-m="도장">도장</button></div>
     <button class="펜지금" id="pencolor" aria-label="색 고르기"><i id="pencolordot"></i><svg class="ico"><use href="#i-down"/></svg></button>
     <span class="갈피"></span>
     <button class="pb" id="eraser"><svg class="ico"><use href="#i-eraser"/></svg>지우개</button>
@@ -126,6 +128,22 @@
   </footer>
 </section>
 
+<!-- ③-⑤ 두 판 견주기 (0.9.6 ⑪) -->
+<section id="cmpview" class="view cmpview" hidden>
+  <header class="bar">
+    <button class="ib" id="cmpback" aria-label="뒤로"><svg class="ico"><use href="#i-back"/></svg></button>
+    <div class="t"><div class="n" id="cmpname"></div><div class="s" id="cmpsub"></div></div>
+    <button class="ib" id="cmpprev" aria-label="앞 달라진 쪽"><svg class="ico"><use href="#i-up"/></svg></button>
+    <button class="ib" id="cmpnext" aria-label="다음 달라진 쪽"><svg class="ico"><use href="#i-down"/></svg></button>
+  </header>
+  <main id="cmpbox" class="cmpbox"><canvas id="cmpcv"></canvas><div id="cmpnote" class="cmp알림" hidden></div></main>
+  <footer class="cmpfoot">
+    <button class="pb" id="cmpleft" aria-label="앞 쪽">‹</button><span id="cmppage" class="cmp쪽"></span><button class="pb" id="cmpright" aria-label="다음 쪽">›</button>
+    <div class="seg" id="cmpmode"><button data-v="앞">앞 판</button><button data-v="겹침" class="on">겹침</button><button data-v="뒤">뒤 판</button></div>
+    <button class="pb" id="cmpzoom">크게</button><button class="pb" id="cmpswap" aria-label="앞뒤 바꾸기">⇄</button>
+  </footer>
+</section>
+
 <!-- ③-④ PDF 쪽 목록 (v0.7) -->
 <section id="thumbs" class="view thumbs" hidden>
   <header class="bar">
@@ -144,6 +162,7 @@
 <div id="dim" class="dim" hidden></div>
 <div id="sheet" class="sheet" hidden></div>
 
+<script src="meta.js"></script>
 <script src="zip.js"></script>
 <script src="docs.js"></script>
 <script src="cfb.js"></script>

@@ -27,7 +27,7 @@
   }));
   const 파일넣기 = (id, 것) => 일('readwrite', s => s.put(것, id));
   const 파일꺼내기 = id => 일('readonly', s => s.get(id));
-  const 파일빼기 = id => 일('readwrite', s => s.delete(id)).catch(() => {});
+  const 파일빼기 = id => 일('readwrite', s => s.delete(id)).catch(() => {}).then(() => 일('readwrite', s => s.delete('text:' + id)).catch(() => {}));   // 문서 속 글(0.9.6)도 같이
   navigator.storage?.persist?.();                      // 사파리가 오래 안 쓴 보관함을 지우지 않게 부탁
   // doc/<id> 는 일꾼을 거치지 않고 여기서 보관함으로 바로 — 처음 연 날은 일꾼이 아직 자리를 안 잡아 「원본 없음」 이 났음 (10-03 실측)
   const 원래fetch = window.fetch.bind(window);
@@ -96,6 +96,8 @@
       for (const o of a) if (o.id === id) { if (!v || (k === '돌림' && v === '0')) delete o[k]; else o[k] = String(v).slice(0, 20000); }
       목록쓰기(a);
     },
+    loadText: id => 일('readonly', s => s.get('text:' + id)).then(v => v || '', () => ''),   // 문서 속 글 (0.9.6 · 전체 찾기)
+    saveText: (id, j) => (목록().some(o => o.id === id) ? 일('readwrite', s => (j ? s.put(j, 'text:' + id) : s.delete('text:' + id))).then(() => true, () => false) : false),
     loadMarks: id => localStorage.getItem(표열쇠(id)) || '',
     saveMarks: (id, j) => {
       if (!목록().some(o => o.id === id)) return false;
@@ -194,6 +196,15 @@
       return URL.createObjectURL(b);
     }),
     놓기: u => { if (typeof u === 'string' && u.startsWith('blob:')) URL.revokeObjectURL(u); },
+    // 쪽마다 글 (0.9.6 · 전체 찾기)
+    async 글(id) {
+      const doc = await 문서(id), pages = [];
+      for (let i = 0; i < doc.numPages; i++) {
+        const tc = await (await doc.getPage(i + 1)).getTextContent();
+        pages.push(tc.items.map(it => (it.str || '') + (it.hasEOL ? '\n' : '')).join('').slice(0, 200000));
+      }
+      return { pages };
+    },
     // 글 찾기 — 빈칸은 빼고 견줌(한글 PDF 는 글자마다 끊기거나 빈칸이 끼는 일이 많음) · 상자는 쪽 안 0~1
     async 찾기(id, q) {
       const doc = await 문서(id), 낱 = q.replace(/\s+/g, '').toLowerCase();

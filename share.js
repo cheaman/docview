@@ -22,6 +22,7 @@ const 보내기 = {};
   x.drawImage(im, 0, 0, w, h);
   const 긋기 = (g, 획) => {
     const p = 획.p; if (!p.length) return;
+    if (도장인가(획)) { const a = 획.a; return 도장캔버스(g, 획, a[0] * w, a[1] * h, a[2] * w, a[3] * h); }   // 도장 · 서명 (0.9.6)
     if (획.t != null) {                              // 글 (0.9.4) — 쓸 때의 방향으로 · 흰 테두리
       const fs = 획.w * w; g.save(); g.translate(p[0] * w, p[1] * h); g.rotate(-(획.r || 0) * Math.PI / 2);
       g.font = `700 ${fs}px Pretendard, system-ui, sans-serif`; g.textBaseline = 'top'; g.lineJoin = 'round';

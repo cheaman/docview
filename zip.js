@@ -113,7 +113,8 @@ async function 압축열기(buf) {
       const b = await 바이트(이름); if (!b) return null;
       const ext = (이름.split('.').pop() || '').toLowerCase();
       const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', bmp: 'image/bmp', svg: 'image/svg+xml', webp: 'image/webp' }[ext];
-      return mime ? URL.createObjectURL(new Blob([b], { type: mime })) : null;   // emf · wmf 는 브라우저가 못 그림 → null
+      if (!mime && (ext === 'wmf' || ext === 'emf') && window.메타그림) { try { return await 메타그림.주소(b); } catch (e) { return null; } }   // emf · wmf → meta.js 가 PNG 로 (0.9.6)
+      return mime ? URL.createObjectURL(new Blob([b], { type: mime })) : null;
     },
   };
 }
