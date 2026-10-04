@@ -107,7 +107,7 @@
       i.type = 'file';
       // 아이폰 파일 고르기는 애플이 모르는 확장자(.hwp · .dxf 등)를 흐리게 막음 → 아이폰은 제한 없이 (못 여는 형식은 앱이 알림)
       if (!/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document))
-        i.accept = '.pdf,.hwp,.hwpx,.doc,.docx,.txt,.xls,.xlsx,.html,.htm,.dxf,.dwg,.zip,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,application/pdf,image/*,text/plain';
+        i.accept = '.pdf,.hwp,.hwpx,.doc,.docx,.txt,.xls,.xlsx,.html,.htm,.dxf,.dwg,.zip,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,application/pdf,image/*,text/plain';
       i.onchange = async () => {
         const f = i.files?.[0]; if (!f) return;
         try { 대기 = JSON.stringify({ id: await 받기(f) }); }
@@ -229,7 +229,7 @@
   addEventListener('DOMContentLoaded', () => {
     const how = document.querySelector('#empty .how');
     if (how) how.innerHTML = `<div><b>카톡에서</b> → 파일 누름 → <span class="pill">공유</span> → <span class="pill">파일에 저장</span> → 여기서 <b>파일 열기</b></div>
-      <div><b>되는 파일</b> → PDF · 한글(HWP · HWPX) · 워드(DOC · DOCX) · TXT · 엑셀 · HTML · 그림(HEIC 포함) · 도면(DXF) · 압축(ZIP — 풀지 않고 안을 봄)</div>`;
+      <div><b>되는 파일</b> → PDF · 한글(HWP · HWPX) · 워드(DOC · DOCX) · TXT · 엑셀 · PPT · HTML · 그림(HEIC 포함) · 도면(DXF) · 압축(ZIP — 풀지 않고 안을 봄)</div>`;
     const 홈에있음 = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
     if (!홈에있음 && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
       const 띠 = document.createElement('div'); 띠.className = '홈안내';

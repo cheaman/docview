@@ -21,6 +21,10 @@ const PDF길 = window.웹PDF || {
   놓기: () => {},
 };
 const 그림놓기 = img => { if (img?.src?.startsWith('blob:')) URL.revokeObjectURL(img.src); };
+const 그림주소놓기 = u => { if (typeof u === 'string' && u.startsWith('blob:')) URL.revokeObjectURL(u); };
+// 쪽으로 보는 문서의 길 — PDF 는 PDF길 · PPT(슬라이드 모양대로)는 ppt.js 의 PPT길 (10-04)
+const 쪽길 = () => 지금?.쪽길 || PDF길;
+const 단위 = () => (지금?.쪽길 === PPT길 ? '장' : '쪽');
 function PC시험목록() {          // PC 크롬 시험 : _시험문서\목록.json 이 있으면 그 파일들로 (앱에는 안 들어감)
   try {
     const x = new XMLHttpRequest(); x.open('GET', '_시험문서/목록.json', false); x.send();
@@ -94,7 +98,7 @@ function 목록그리기() {
 }
 // 목록 딱지 색 — 첫 화면 · ZIP 안 목록(zipview.js) 같이 씀
 function 딱지(ext) {
-  return ['pdf', 'hwp', 'hwpx', 'doc', 'docx', 'txt'].includes(ext) ? ext : ['html', 'htm'].includes(ext) ? 'html' : ['xls', 'xlsx'].includes(ext) ? 'xls' : 그림형식.includes(ext) ? 'img' : ['dxf', 'dwg'].includes(ext) ? 'cad' : 압축형식.includes(ext) ? 'zip' : 'etc';
+  return ['pdf', 'hwp', 'hwpx', 'doc', 'docx', 'txt'].includes(ext) ? ext : ['html', 'htm'].includes(ext) ? 'html' : ['xls', 'xlsx'].includes(ext) ? 'xls' : 그림형식.includes(ext) ? 'img' : ['dxf', 'dwg'].includes(ext) ? 'cad' : ['ppt', 'pptx'].includes(ext) ? 'ppt' : 압축형식.includes(ext) ? 'zip' : 'etc';
 }
 function 때(ms) {
   const d = new Date(ms), 오늘 = new Date();
@@ -177,13 +181,14 @@ function 열기(id, 쌓기, 덧 = {}) {
   손모드(); 쪽지보이기();
   if (지금.표시.메모?.length) setTimeout(() => 지금?.id === id && 칩(`📝 메모 ${지금.표시.메모.length}개`), 700);
   if (지금.ext === 'pdf') return pdf열기(d);
-  if (['txt', 'docx', 'hwpx', 'hwp', 'doc', 'xlsx', 'xls', 'html', 'htm'].includes(지금.ext)) return 글문서열기(d);
+  if (지금.ext === 'pptx' && !PPT글로) { 지금.쪽길 = PPT길; return pdf열기(d); }
+  if (['txt', 'docx', 'hwpx', 'hwp', 'doc', 'xlsx', 'xls', 'html', 'htm', 'pptx', 'ppt'].includes(지금.ext)) return 글문서열기(d);
   if (그림형식.includes(지금.ext)) return 그림열기(d);
   if (지금.ext === 'dxf') return 도면열기(d);
   if (지금.ext === 'zip') return 압축보기.열기(d, 덧.폴더);
   if (지금.ext === 'dwg') return 알림('<b>DWG → 못 엶</b><div class="sm">오토데스크 비공개 형식 · 보낸 분께 PDF 나 DXF 로 받기</div>');
   if (압축형식.includes(지금.ext)) return 알림(`<b>${글(지금.ext.toUpperCase())} 압축 → 못 엶 (ZIP 만 됨)</b><div class="sm">알집(ALZ · EGG) · 7Z · RAR 은 보낸 분께 ZIP 으로 받기</div>`);
-  알림(`<b>아직 못 여는 형식 · ${글((지금.ext || '?').toUpperCase())}</b><div class="sm">되는 것 → PDF · 한글 · 워드 · TXT · 엑셀 · HTML · 그림 · DXF · ZIP</div>`);
+  알림(`<b>아직 못 여는 형식 · ${글((지금.ext || '?').toUpperCase())}</b><div class="sm">되는 것 → PDF · 한글 · 워드 · TXT · 엑셀 · PPT · HTML · 그림 · DXF · ZIP</div>`);
 }
 const 압축형식 = ['zip', 'alz', 'egg', '7z', 'rar'];
 // ③-3 그림 — 브라우저가 그리는 것은 원본 그대로, HEIC 등은 껍데기가 JPEG 로 바꿔 줌 (/img/) · 확대 · 밀기는 PDF 와 같음
@@ -299,7 +304,7 @@ async function 글문서열기(d) {
   }
   if (지금?.id !== d.id) return;
   지금.buf = buf; 지금.글자만 = false;
-  const 종류 = { txt: 'TXT', docx: '워드', hwpx: '한글', hwp: '한글 (HWP)', doc: '옛 워드 (DOC)', xlsx: '엑셀', xls: '엑셀 (XLS)', html: 'HTML', htm: 'HTML' }[지금.ext];
+  const 종류 = { txt: 'TXT', docx: '워드', hwpx: '한글', hwp: '한글 (HWP)', doc: '옛 워드 (DOC)', xlsx: '엑셀', xls: '엑셀 (XLS)', html: 'HTML', htm: 'HTML', pptx: 'PPT', ppt: '옛 PPT' }[지금.ext];
   try {
     const 결과 = await 문서[지금.ext](buf);
     if (지금?.id !== d.id) return;
@@ -307,7 +312,8 @@ async function 글문서열기(d) {
     $('#vsub').textContent = 종류 + (결과.덧 ? ' · ' + 결과.덧 : '');
     if (결과.알림) 알림(`<b>${글(결과.알림)}</b>`);
     if (!안.textContent.trim() && !안.querySelector('img')) 알림('<b>글자가 없는 문서</b><div class="sm">그림만 든 문서일 수 있음</div>');
-    도구보이기(['txt', 'xlsx', 'xls'].includes(지금.ext) ? ['find', 'size'] : ['find', 'size', 'plain']);
+    도구보이기(['txt', 'xlsx', 'xls', 'ppt'].includes(지금.ext) ? ['find', 'size'] : 지금.ext === 'pptx' ? ['find', 'size', 'pptmode'] : ['find', 'size', 'plain']);
+    if (지금.ext === 'pptx') 피피티모드글();
   } catch (e) {                                         // 모양을 못 그리면 글자만이라도
     let 글자 = '';
     try { 글자 = await 문서.글자만뽑기(지금.ext, buf); } catch (e2) {}
@@ -424,7 +430,7 @@ async function pdf찾기(q) {
   const 번호 = 찾기번호;
   $('#fcnt').textContent = '찾는 중…';
   let o;
-  try { o = await PDF길.찾기(지금.id, q); }
+  try { o = await 쪽길().찾기(지금.id, q); }
   catch (e) { o = { error: '깨짐', detail: (폰 || 웹 ? '' : 'PC 시험 화면 · ') + String(e.message || e) }; }
   if (번호 !== 찾기번호 || !지금?.쪽수) return;                      // 그사이 낱말을 바꿨거나 문서를 닫음
   if (o.error === '판') { $('#fcnt').textContent = ''; return 알림(`<b>PDF 안 글 찾기 → 안드로이드 15 이상에서만</b><div class="sm">이 폰 ${글(o.detail || '')}</div>`); }
@@ -461,7 +467,7 @@ let 지켜보기 = null;
 async function pdf열기(d) {
   let 정보;
   try {
-    정보 = await PDF길.정보(d.id);
+    정보 = await 쪽길().정보(d.id);
   } catch (e) {
     정보 = { error: '깨짐', detail: (폰 || 웹 ? '' : 'PC 시험 화면 · ') + String(e.message || e) };
   }
@@ -470,8 +476,10 @@ async function pdf열기(d) {
   if (정보.error === '원본 없음') return 알림('<b>원본 없음</b><div class="sm">목록의 ⋯ → 목록에서 빼기 → 다시 받아 열기</div>');
   if (정보.error) return 알림(`<b>열 수 없음 · 파일이 깨졌을 수 있음</b><div class="sm">${글(정보.detail || 정보.error)}</div>`);
   지금.쪽수 = 정보.pages;
-  $('#vsub').textContent = `PDF · ${정보.pages}쪽`;
-  도구보이기(정보.pages < 2 ? ['find', 'rot', 'pen'] : ['goto', 'find', 'rot', 'pen']);
+  const ppt = 지금.쪽길 === PPT길;
+  $('#vsub').textContent = ppt ? `PPT · 슬라이드 ${정보.pages}장` : `PDF · ${정보.pages}쪽`;
+  도구보이기([...(정보.pages < 2 ? [] : ['goto']), 'find', 'rot', 'pen', ...(ppt ? ['pptmode'] : [])]);
+  if (ppt) 피피티모드글();
   const 틀 = $('#pages');
   틀.innerHTML = 정보.sizes.map(([w, h], i) =>
     `<div class="pg" data-n="${i}" data-pw="${w}" data-ph="${h}"><span class="no">${i + 1}</span><div class="속"><svg class="hl" viewBox="0 0 ${w} ${h}"></svg><svg class="mk" viewBox="0 0 ${w} ${h}"></svg></div></div>`).join('');
@@ -497,8 +505,8 @@ function 쪽그리기(p, 다시) {
   const 못그림 = () => { 그림놓기(img); img.remove(); p.querySelector('.no').textContent = `${Number(p.dataset.n) + 1}쪽 · 못 그림`; };
   img.onerror = 못그림;
   const id = 지금.id;
-  PDF길.쪽(id, Number(p.dataset.n), w).then(주소 => {
-    if (!img.isConnected || 지금?.id !== id || Number(img.dataset.w) !== w) return PDF길.놓기(주소);   // 그사이 비웠거나 다시 그림
+  쪽길().쪽(id, Number(p.dataset.n), w).then(주소 => {
+    if (!img.isConnected || 지금?.id !== id || Number(img.dataset.w) !== w) return 그림주소놓기(주소);   // 그사이 비웠거나 다시 그림
     그림놓기(img); img.src = 주소;
   }, 못그림);
 }
@@ -511,7 +519,7 @@ $('#reader').addEventListener('scroll', () => {
   const r = $('#reader'), 가운데 = r.scrollTop + r.clientHeight / 2;
   let n = 1;
   for (const p of $('#pages').children) { if (p.offsetTop <= 가운데) n = Number(p.dataset.n) + 1; else break; }
-  칩(`${n} / ${지금.쪽수}쪽`);
+  칩(`${n} / ${지금.쪽수}${단위()}`);
 }, { passive: true });
 
 // ④-2 돌리기 (v0.6) — 그림 · PDF 는 쪽 틀(.pg)의 비율을 뒤집고 안쪽 틀(.속 = 그림 + 펜 표시)을 가운데에서 돌림 · 도면은 dxf.js
@@ -541,6 +549,16 @@ function 돌리기(걸음 = 1) {
   선명하게();
 }
 $('#rot').addEventListener('click', () => 돌리기(1));
+
+// ④-2b PPT 보는 방식 (10-04 · 전무님 「둘 다 · 단추로 바꿈」) — 기본 「슬라이드 모양대로」(쪽 화면) · 「글로」(글 문서 화면)
+let PPT글로 = false;
+function 피피티모드글() { $('#pptmodelab').textContent = PPT글로 ? '모양대로' : '글로'; }
+$('#pptmode').addEventListener('click', () => {
+  if (!지금 || 지금.ext !== 'pptx') return;
+  PPT글로 = !PPT글로;
+  열기(지금.id, false, { 깊이: 지금.깊이, 압축에서: 지금.압축에서 });
+  칩(PPT글로 ? '글로 이어 보기' : '슬라이드 모양대로');
+});
 
 // ④-3 펜 표시 (v0.6) — 원본은 안 고치고 앱 안 files/marks/<id>.json 에
 //   좌표는 문서 좌표 : PDF · 그림은 쪽(안 돌린 원래 쪽) 안 0~1 비율 · 도면은 도면 좌표 → 키우기 · 돌리기 · 폴드에도 제자리
@@ -706,14 +724,14 @@ function 보는쪽() {
 }
 function 쪽으로(n) {
   const p = $('#pages').children[Math.min(지금.쪽수 - 1, Math.max(0, n))];
-  if (p) { $('#reader').scrollTop = p.offsetTop - 10; 칩(`${Number(p.dataset.n) + 1} / ${지금.쪽수}쪽`); }
+  if (p) { $('#reader').scrollTop = p.offsetTop - 10; 칩(`${Number(p.dataset.n) + 1} / ${지금.쪽수}${단위()}`); }
 }
 function 쪽목록열기() {
   if (!지금?.쪽수) return;
   const N = 지금.쪽수, 지금쪽 = 보는쪽(), 그리드 = $('#tgrid');
   history.pushState({ v: 'thumbs' }, '');
   $('#thumbs').hidden = false;
-  $('#tsub').textContent = `${N}쪽 · 지금 ${지금쪽 + 1}쪽`;
+  $('#tsub').textContent = `${N}${단위()} · 지금 ${지금쪽 + 1}${단위()}`;
   $('#tn').max = N; $('#tn').value = '';
   그리드.innerHTML = [...$('#pages').children].map(pg => {
     const n = Number(pg.dataset.n);
@@ -728,7 +746,7 @@ function 쪽목록열기() {
       const w = Math.round(Math.min(600, 틀.clientWidth * (devicePixelRatio || 1) * (지금.돌림 & 1 ? 틀.dataset.pw / 틀.dataset.ph : 1)));
       im.onerror = () => { 그림놓기(im); im.remove(); };
       틀.firstChild.append(im);
-      PDF길.쪽(지금.id, Number(틀.parentNode.dataset.n), Math.max(200, w)).then(주소 => (im.isConnected ? (im.src = 주소) : PDF길.놓기(주소)), () => im.remove());
+      쪽길().쪽(지금.id, Number(틀.parentNode.dataset.n), Math.max(200, w)).then(주소 => (im.isConnected ? (im.src = 주소) : 그림주소놓기(주소)), () => im.remove());
     }
   }, { root: 그리드, rootMargin: '400px 0px' });
   그리드.querySelectorAll('.썸틀').forEach(t => 쪽목록지켜봄.observe(t));
@@ -783,9 +801,9 @@ function 보내기판() {
   const 덧 = [Object.keys(지금.표시.쪽).length ? '펜' : '', 지금.표시.메모?.length ? '메모' : '', d.메모 ? '쪽지' : '', 지금.돌림 ? '돌림' : ''].filter(Boolean).join(' · ');
   const 줄 = [];
   if (지금.쪽수) {
-    if (표쪽.length) 줄.push(['표쪽', `✏ 펜 · 메모 있는 쪽만 → PDF (${표쪽.length}쪽)`]);
-    if (지금.쪽수 <= 300) 줄.push(['모든쪽', `모든 쪽 → PDF (${지금.쪽수}쪽)`]);
-    줄.push(['이쪽', `지금 보는 쪽만 → 그림 (${보는쪽() + 1}쪽)`]);
+    if (표쪽.length) 줄.push(['표쪽', `✏ 펜 · 메모 있는 ${단위()}만 → PDF (${표쪽.length}${단위()})`]);
+    if (지금.쪽수 <= 300) 줄.push(['모든쪽', `모든 ${단위()} → PDF (${지금.쪽수}${단위()})`]);
+    줄.push(['이쪽', `지금 보는 ${단위()}만 → 그림 (${보는쪽() + 1}${단위()})`]);
   } else if (지금.그림) 줄.push(['그림', '표시 입힌 그림']);
   else if (도면판) { 줄.push(['도면전체', '도면 전체 → 그림 (흰 바탕)']); 줄.push(['도면화면', '지금 보이는 만큼 → 그림 (흰 바탕)']); }
   줄.push(['원본', '원본 그대로']);
@@ -815,10 +833,10 @@ async function 사본보내기(k) {
       const 결과 = [], 번호표 = { n: 0, 목록: [] };
       for (const [i, n] of 쪽들.entries()) {
         if (지금?.id !== id) return;
-        진행(`사본 만드는 중 ${i + 1} / ${쪽들.length}쪽`);
+        진행(`사본 만드는 중 ${i + 1} / ${쪽들.length}${단위()}`);
         const pg = $('#pages').children[n], pw = +pg.dataset.pw, ph = +pg.dataset.ph;
         const w = Math.round(Math.min(2000, Math.max(800, pw * 2)));          // 1pt = 2화소 (144 dpi)
-        const 주소 = await PDF길.쪽(id, n, w), im = await 보내기.그림받기(주소); PDF길.놓기(주소);
+        const 주소 = await 쪽길().쪽(id, n, w), im = await 보내기.그림받기(주소); 그림주소놓기(주소);
         const c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽[n], i === 0 ? d.메모 : null);
         보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === String(n)), { 돌: 지금.돌림, 번호표, 쪽: n + 1 });
         const jpg = await 보내기.바이트(c, 'image/jpeg', 0.85);

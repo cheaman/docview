@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1a1d24" media="(prefers-color-scheme: dark)">
-<meta name="docview-ver" content="1004-134203">
+<meta name="docview-ver" content="1004-142159">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="app.css">
@@ -54,7 +54,7 @@
     <h2>아직 연 문서 없음</h2>
     <div class="how">
       <div><b>카톡에서</b> → 파일 누름 → <span class="pill">⋮</span> → <span class="pill">다른 앱으로 열기</span> → 문서 보기</div>
-      <div><b>되는 파일</b> → PDF · 한글(HWP · HWPX) · 워드(DOC · DOCX) · TXT · 엑셀(XLS · XLSX) · HTML · 그림(JPG · PNG · HEIC 등) · 도면(DXF) · 압축(ZIP — 풀지 않고 안을 봄)</div>
+      <div><b>되는 파일</b> → PDF · 한글(HWP · HWPX) · 워드(DOC · DOCX) · TXT · 엑셀(XLS · XLSX) · PPT(PPTX · 옛 PPT) · HTML · 그림(JPG · PNG · HEIC 등) · 도면(DXF) · 압축(ZIP — 풀지 않고 안을 봄)</div>
       <div><b>녹화 영상</b> → 갤러리에서 <span class="pill">공유</span> → 문서 보기 → 장면판으로 클로드에게 (위 🎬)</div>
     </div>
   </div>
@@ -107,6 +107,7 @@
     <button class="tool" id="rot"><svg class="ico"><use href="#i-rot"/></svg>돌리기</button>
     <button class="tool" id="pen"><svg class="ico"><use href="#i-pen"/></svg>펜</button>
     <button class="tool" id="measure"><svg class="ico"><use href="#i-ruler"/></svg>재기</button>
+    <button class="tool" id="pptmode"><svg class="ico"><use href="#i-plain"/></svg><span id="pptmodelab">글로</span></button>
     <button class="tool" id="share"><svg class="ico"><use href="#i-share"/></svg>보내기</button>
   </footer>
 </section>
@@ -134,6 +135,7 @@
 <script src="dxf.js"></script>
 <script src="xls.js"></script>
 <script src="html.js"></script>
+<script src="ppt.js"></script>
 <script src="share.js"></script>
 <script src="zipview.js"></script>
 <script src="web.js"></script>

@@ -306,3 +306,10 @@ i.형광점 { border-radius:7px !important; }
 .zip요약 { font-size:13px; color:var(--sub); margin:0 6px 10px; }
 .zip모두 { display:block; width:100%; margin:0 0 12px; padding:13px 14px; border-radius:var(--radius); background:var(--accent); color:var(--on-accent); font-weight:700; font-size:15px; text-align:center; }
 .zipbox .item .s .자물쇠 { color:#c0392b; }
+
+/* PPT 보기 (10-04 · ppt.js) — 목록 딱지 · 「글로」 의 장 머리 · 발표자 메모 */
+.b-ppt { background:#d35400; }
+.flowin .ppt장머리 { display:inline-block; margin:1.4em 0 .3em; padding:1px 10px; border-radius:10px; background:#d35400; color:#fff; font-family:var(--font); font-size:13px; font-weight:700; }
+.flowin .ppt글 > .ppt장머리:first-child { margin-top:0; }
+.flowin .ppt글 h4 { font-size:1.15em; }
+.flowin .ppt메모 { margin:.5em 0 .8em; padding:.45em .8em; border-left:3px solid #d35400; background:rgba(211,84,0,.07); font-size:.88em; white-space:pre-wrap; }
