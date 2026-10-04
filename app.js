@@ -23,6 +23,7 @@ const PDF길 = window.웹PDF || {
 };
 const 그림놓기 = img => { if (img?.src?.startsWith('blob:')) URL.revokeObjectURL(img.src); };
 const 그림주소놓기 = u => { if (typeof u === 'string' && u.startsWith('blob:')) URL.revokeObjectURL(u); };
+const 흐름비우기 = () => { const 안 = $('#flowin'); 안.querySelectorAll('img').forEach(i => 그림주소놓기(i.src)); 안.innerHTML = ''; };   // 글 문서 그림(워드 · 한글 수백 장)을 놓아 줌 (0.9.9)
 // 쪽으로 보는 문서의 길 — PDF 는 PDF길 · PPT(슬라이드 모양대로)는 ppt.js 의 PPT길 (10-04)
 const 쪽길 = () => 지금?.쪽길 || PDF길;
 const 단위 = () => (지금?.쪽길 === PPT길 ? '장' : '쪽');
@@ -662,13 +663,14 @@ async function 글뽑기(d) {
   const r = await fetch(문서주소(d)); if (!r.ok) return { v: 1, 없음: '원본 없음' };
   const buf = await r.arrayBuffer();
   let 글 = '';
-  try { const 결과 = await 문서[ext](buf); 글 = 틀글(결과.틀); 결과.틀.querySelectorAll('img[src^="blob:"]').forEach(i => URL.revokeObjectURL(i.src)); }
+  try { const 결과 = await 문서[ext](buf, { 글만: true }); 글 = 틀글(결과.틀); 결과.틀.querySelectorAll('img[src^="blob:"]').forEach(i => URL.revokeObjectURL(i.src)); }
   catch (e) { try { 글 = await 문서.글자만뽑기(ext, buf); } catch (e2) {} }
-  return { v: 1, 글: 글.slice(0, 2e6) };
+  return { v: ext === 'hwp' ? 2 : 1, 글: 글.slice(0, 2e6) };
 }
 async function 글읽기(d) {
   if (글캐시.has(d.id)) return 글캐시.get(d.id);
   let o = null; try { const j = await 다리.loadText?.(d.id); if (j) o = JSON.parse(j); } catch (e) {}
+  if (o && String(d.ext || '').toLowerCase() === 'hwp' && !(o.v >= 2)) o = null;   // 0.9.8 까지 뽑은 옛 한글 글은 뒤가 잘렸을 수 있음 → 다시 뽑음 (0.9.9)
   if (o) 글캐시.set(d.id, o);
   return o;
 }
@@ -805,7 +807,7 @@ function 열기(id, 쌓기, 덧 = {}) {
   $('#vname').textContent = d.name;
   $('#vsub').textContent = (d.ext || '').toUpperCase();
   $('#note').hidden = true; $('#pages').querySelectorAll('img').forEach(그림놓기); $('#pages').innerHTML = ''; $('#tools').hidden = true;
-  찾기닫기(); $('#flowin').innerHTML = ''; $('#flow').hidden = true; $('#reader').hidden = false;
+  찾기닫기(); 흐름비우기(); $('#flow').hidden = true; $('#reader').hidden = false;
   $('#cadbox').hidden = true; 도면판?.끝(); 도면판 = null; $('#zipbox').hidden = true;
   표시마저쓰기(); 펜끄기(); 재기끄기(); 쪽목록닫기(); 되돌릴것 = [];
   $('#bmk').hidden = true; $('#resume').hidden = true;
@@ -973,12 +975,12 @@ $('#plain').addEventListener('click', async () => {
   const 안 = $('#flowin');
   if (!지금.글자만) {
     const 글자 = 안.innerText;
-    안.innerHTML = '';
+    흐름비우기();
     안.append(Object.assign(document.createElement('div'), { className: '글자만', textContent: 글자 }));
     지금.글자만 = true;
   } else {
     const 결과 = await 문서[지금.ext](지금.buf);
-    안.innerHTML = ''; 안.append(결과.틀);
+    흐름비우기(); 안.append(결과.틀);
     지금.글자만 = false;
   }
   $('#plain').classList.toggle('on', 지금.글자만);
@@ -2208,7 +2210,7 @@ function 목록으로() {
   $('#viewer').hidden = true; $('#home').hidden = false; 판닫기(); $('#zipbox').hidden = true; $('#zipbox').innerHTML = ''; 압축보기.비우기();
   if (지켜보기) 지켜보기.disconnect();
   for (const img of $('#flowin').querySelectorAll('img[src^="blob:"]')) URL.revokeObjectURL(img.src);
-  $('#pages').querySelectorAll('img').forEach(그림놓기); $('#pages').innerHTML = ''; $('#flowin').innerHTML = ''; 지금 = null; 밤적용();
+  $('#pages').querySelectorAll('img').forEach(그림놓기); $('#pages').innerHTML = ''; 흐름비우기(); 지금 = null; 밤적용();
   $('#plain').classList.remove('on'); $('#plainlab').textContent = '글자만';
   목록그리기();
 }

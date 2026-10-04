@@ -107,6 +107,8 @@ button { font:inherit; color:inherit; background:none; border:0; padding:0; curs
 .flowin td p { margin:0; }
 .flowin .그림 { max-width:100%; height:auto; display:inline-block; vertical-align:middle; }
 .flowin .빈그림 { color:var(--sub); font-size:.85em; }
+.flowin .그림틀 { text-align:center; margin:.4em 0; }   /* 옛 한글 — 글자처럼 취급 안 한 그림 · 묶음 (10-05) */
+.flowin .그림.채우는중 { background:var(--rule); min-width:3em; min-height:2em; }   /* 뒤에서 꺼내는 중인 그림 자리 */
 .flowin .탭 { display:inline-block; min-width:2em; }
 .flowin .글머리 { color:var(--accent-ink); }
 .flowin .글상자 { border:1px dashed var(--rule); border-radius:6px; padding:.5em .7em; margin:.4em 0; }
