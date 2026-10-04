@@ -56,7 +56,7 @@
     for (const o of 옛) {
       const 같음 = o.name === 새.name && o.size === 새.size;   // 같은 파일을 또 받으면 쪽지 · 돌림 · 펜 표시를 새 줄로
       if (같음) {
-        for (const k of ['메모', '돌림']) if (o[k] != null && 새[k] == null) 새[k] = o[k];
+        for (const k of ['메모', '돌림', '묶음']) if (o[k] != null && 새[k] == null) 새[k] = o[k];
         const 표 = localStorage.getItem(표열쇠(o.id)); if (표 && !localStorage.getItem(표열쇠(id))) 쓰기(표열쇠(id), 표);
       }
       if (같음 || a.length >= 최대) { 파일빼기(o.id); 쓰기(표열쇠(o.id), null); } else a.push(o);
@@ -90,7 +90,7 @@
     recent: () => JSON.stringify(목록()),
     remove: id => { 목록쓰기(목록().filter(o => o.id !== id)); 파일빼기(id); 쓰기(표열쇠(id), null); },
     setInfo: (id, k, v) => {
-      if (!['메모', '돌림'].includes(k)) return;
+      if (!['메모', '돌림', '묶음'].includes(k)) return;   // 묶음 (10-04) : 과업 이름표 — 줄바꿈으로 여럿
       const a = 목록();
       for (const o of a) if (o.id === id) { if (!v || (k === '돌림' && v === '0')) delete o[k]; else o[k] = String(v).slice(0, 20000); }
       목록쓰기(a);
@@ -117,6 +117,11 @@
       i.click();
     },
     shareBytes: (이름, 꼴, 바이트) => 보낼판(new File([바이트], 이름, { type: 꼴 })),
+    // 복사 (10-04) — 그림을 클립보드로 · 사파리는 «누른 손가락» 안에서 바로 불러야 해서 그림은 약속(Promise)으로 받음
+    copyImage: 약속 => {
+      if (!navigator.clipboard?.write || !window.ClipboardItem) return Promise.reject(new Error('이 브라우저는 그림 복사를 못 함'));
+      return navigator.clipboard.write([new ClipboardItem({ 'image/png': 약속 })]);
+    },
     // ZIP 에서 꺼낸 파일을 받은 문서처럼 (10-04 · zipview.js) → 새 id
     addBytes: (이름, 어디서, 바이트) => 받기(new File([바이트], 이름, { type: '' }), 어디서),
     shareOriginal: id => {

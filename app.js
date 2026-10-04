@@ -63,39 +63,163 @@ const 다리 = window.Android || window.웹다리 || {
     return id;
   },
   saveBytes: (폴더, n, b) => { (window.마지막저장 ||= []).push({ 폴더, 이름: n, 크기: b.length }); return true; },
+  copyImage: 약속 => 약속.then(b => { window.마지막복사 = b; }),          // 복사 (10-04) — PC 는 window.마지막복사 에 그림만
 };
 const PC꺼낸것 = [];
-if (!window.Android && !window.웹다리) { const 옛 = 다리.recent; 다리.recent = () => JSON.stringify([...PC꺼낸것, ...JSON.parse(옛())]); }
+if (!window.Android && !window.웹다리) { const 옛 = 다리.recent; 다리.recent = () => JSON.stringify([...PC꺼낸것.map(d => ({ ...d, ...(PC덧['i' + d.id] || {}) })), ...JSON.parse(옛())]); }
 const $ = s => document.querySelector(s);
 const 글 = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ② 최근 목록 ──────────────────────────────────────
+//   10-04 (목업 1_읽을거리\복사_목업.html 승인) : 형식 칩 · 과업 묶음 칩 (「형식 | 묶음」) · 고르기(한꺼번에 지우기 · 묶음에 넣기) · 이름 비슷한 것 묶음 권함
+//   묶음 = 이름표만 (recent 줄의 「묶음」 칸 · 줄바꿈으로 여럿 · 껍데기 setInfo) — 파일 · 원본은 그대로
 let 목록 = [];
+const 형식표 = [['PDF', ['pdf']], ['한글', ['hwp', 'hwpx']], ['워드', ['doc', 'docx']], ['엑셀', ['xls', 'xlsx']], ['PPT', ['ppt', 'pptx']], ['그림', null], ['ZIP', null], ['도면', ['dxf', 'dwg']], ['영상', null], ['글', ['txt', 'html', 'htm']]];
+function 형식이름(ext) {
+  ext = (ext || '').toLowerCase();
+  for (const [이름, 들] of 형식표) {
+    if (들 ? 들.includes(ext) : 이름 === '그림' ? 그림형식.includes(ext) : 이름 === 'ZIP' ? 압축형식.includes(ext) : 영상형식.includes(ext)) return 이름;
+  }
+  return '그 밖';
+}
+const 묶음들 = d => String(d.묶음 || '').split('\n').map(s => s.trim()).filter(Boolean);
+const 보기설정 = Object.assign({ 방식: '형식', 형식: '모두', 묶음: '모두' }, (() => { try { return JSON.parse(localStorage.getItem('목록보기') || '{}'); } catch (e) { return {}; } })());
+const 보기저장 = () => { try { localStorage.setItem('목록보기', JSON.stringify(보기설정)); } catch (e) {} };
+let 고름 = null;                                       // 고르기 중이면 Set(id) · 아니면 null
+function 통과(d) {
+  if (보기설정.방식 === '형식') return 보기설정.형식 === '모두' || 형식이름(d.ext) === 보기설정.형식;
+  return 보기설정.묶음 === '모두' || 묶음들(d).includes(보기설정.묶음);
+}
+function 칩줄그리기() {
+  const 형식 = 보기설정.방식 === '형식', 셈 = new Map();
+  for (const d of 목록) for (const k of 형식 ? [형식이름(d.ext)] : 묶음들(d)) 셈.set(k, (셈.get(k) || 0) + 1);
+  const 열쇠 = 형식 ? '형식' : '묶음';
+  if (보기설정[열쇠] !== '모두' && !셈.has(보기설정[열쇠])) { 보기설정[열쇠] = '모두'; 보기저장(); }   // 지운 뒤 빈 칩은 「모두」 로
+  const 차례 = 형식 ? [...형식표.map(x => x[0]), '그 밖'].filter(k => 셈.has(k)) : [...셈.keys()].sort((a, b) => a.localeCompare(b, 'ko'));
+  const 칩 = (k, n) => `<button class="칩${k === 보기설정[열쇠] ? ' on' : ''}" data-k="${글(k)}">${글(k)}${n != null ? ` <i>${n}</i>` : ''}</button>`;
+  $('#kinds').innerHTML = `<div class="나눔"><button data-m="형식" class="${형식 ? 'on' : ''}">형식</button><button data-m="묶음" class="${형식 ? '' : 'on'}">묶음</button></div>`
+    + 칩('모두', 목록.length) + 차례.map(k => 칩(k, 셈.get(k))).join('')
+    + (형식 ? '' : '<button class="칩" data-k="＋" aria-label="새 묶음">＋ 묶음</button>');
+  $('#kinds').hidden = 목록.length === 0;
+}
+// 묶음 권함 — 파일 이름에 같은 낱말이 든 것 셋 이상 (흔한 말 · 숫자 뺌) · 「됐음」 한 낱말은 다시 안 물음 · 인터넷 · AI 없음
+const 흔한말 = new Set(['보고서', '최종', '수정', '수정본', '사본', '자료', '파일', '문서', '첨부', '회신', '최신', '검토', '의견', '결과', '목록', '시험', '사진', '카톡', '복사본', 'copy', 'final', 'scan', 'img', 'image', 'screenshot', 'kakaotalk', 'photo', 'document']);
+function 묶음권함() {
+  if (보기설정.방식 !== '묶음' || 고름) return '';
+  let 닫음 = []; try { 닫음 = JSON.parse(localStorage.getItem('묶음권함닫음') || '[]'); } catch (e) {}
+  const 셈 = new Map();
+  for (const d of 목록) {
+    const 낱 = new Set(String(d.name || '').replace(/\.[^.]+$/, '').split(/[\s_\-.,()[\]·+~]+/).filter(s => s.length >= 2 && !/^[\d]+$/.test(s) && !흔한말.has(s.toLowerCase())));
+    for (const w of 낱) { if (!셈.has(w)) 셈.set(w, []); 셈.get(w).push(d); }
+  }
+  let 좋은 = null;
+  for (const [w, 들] of 셈) {
+    if (들.length < 3 || 닫음.includes(w) || 들.every(d => 묶음들(d).includes(w))) continue;
+    if (!좋은 || 들.length > 좋은[1].length || (들.length === 좋은[1].length && w.length > 좋은[0].length)) 좋은 = [w, 들];
+  }
+  if (!좋은) return '';
+  return `<div class="권함"><b>권함</b> · 이름에 「${글(좋은[0])}」 든 파일 ${좋은[1].length}개 → 묶음으로?
+    <div class="권함단추"><button class="칩 on" data-권함="만들기" data-w="${글(좋은[0])}">「${글(좋은[0])}」 묶음 만들기</button><button class="칩" data-권함="됐음" data-w="${글(좋은[0])}">됐음</button></div></div>`;
+}
 function 목록그리기() {
   try { 목록 = JSON.parse(다리.recent() || '[]'); } catch (e) { 목록 = []; }
+  if (고름) for (const id of [...고름]) if (!목록.some(d => d.id === id)) 고름.delete(id);
   $('#empty').hidden = 목록.length > 0;
   $('#list').hidden = 목록.length === 0;
+  칩줄그리기();
+  const 보일것 = 목록.filter(통과);
   const 오늘0 = new Date(); 오늘0.setHours(0, 0, 0, 0);
   const 묶음 = { '오늘': [], '이번 주': [], '그 전': [] };
-  for (const d of 목록) {
+  for (const d of 보일것) {
     const k = d.when >= 오늘0.getTime() ? '오늘' : d.when >= 오늘0.getTime() - 6 * 864e5 ? '이번 주' : '그 전';
     묶음[k].push(d);
   }
-  let h = '';
+  let h = 묶음권함();
   for (const [k, arr] of Object.entries(묶음)) {
     if (!arr.length) continue;
-    if (h) h += '</div>';
-    h += `<div class="sec">${k}</div><div class="묶음">`;              // DSM (10-04) — 때 묶음마다 카드 하나 + 가는 줄
+    const 다 = 고름 && arr.every(d => 고름.has(d.id));
+    h += `<div class="sec"><span>${k}</span>${고름 ? `<button class="모두칸${다 ? ' on' : ''}" data-sec="${k}">${다 ? '모두 ✓' : '모두'}</button>` : ''}</div><div class="묶음">`;   // DSM (10-04) — 때 묶음마다 카드 하나 + 가는 줄
     for (const d of arr) {
-      const ext = (d.ext || '').toLowerCase();
+      const ext = (d.ext || '').toLowerCase(), 표 = 묶음들(d);
       h += `<div class="item" data-id="${글(d.id)}" role="button">
+        ${고름 ? `<span class="고름칸${고름.has(d.id) ? ' on' : ''}" aria-hidden="true">✓</span>` : ''}
         <span class="badge b-${딱지(ext)}">${글((ext || '?').toUpperCase().slice(0, 4))}</span>
-        <div class="t"><div class="n">${글(d.name)}</div><div class="s">${글(d.from || '')} · ${때(d.when)}${d.size > 0 ? ' · ' + 크기(d.size) : ''}</div>${d.메모 ? `<div class="memo">📝 ${글(d.메모.split('\n')[0].slice(0, 60))}</div>` : ''}</div>
-        <button class="more" data-more="${글(d.id)}" aria-label="더 보기"><svg class="ico"><use href="#i-more"/></svg></button>
+        <div class="t"><div class="n">${글(d.name)}</div><div class="s">${글(d.from || '')} · ${때(d.when)}${d.size > 0 ? ' · ' + 크기(d.size) : ''}${표.length ? ' · 🏷 ' + 글(표.join(', ')) : ''}</div>${d.메모 ? `<div class="memo">📝 ${글(d.메모.split('\n')[0].slice(0, 60))}</div>` : ''}</div>
+        ${고름 ? '' : `<button class="more" data-more="${글(d.id)}" aria-label="더 보기"><svg class="ico"><use href="#i-more"/></svg></button>`}
       </div>`;
     }
+    h += '</div>';
   }
-  $('#list').innerHTML = h ? h + '</div>' : '';
+  if (목록.length && !보일것.length) h += '<div class="빈칸글">이 칩에 든 문서 없음</div>';
+  $('#list').innerHTML = h;
+  고르기판갱신();
+}
+// 고르기 (10-04) — 한꺼번에 지우기 · 묶음에 넣기 · 뒤로 = 끝
+function 고르기시작(id) {
+  if (고름) { if (id) 고름.add(id); return 목록그리기(); }
+  고름 = new Set(id ? [id] : []);
+  history.pushState({ v: '고르기' }, '');
+  목록그리기();
+}
+function 고르기끝() {
+  if (!고름) return;
+  if (history.state?.v === '고르기') return history.back();          // popstate 가 마저 닫음
+  고름 = null; 목록그리기();
+}
+function 고르기판갱신() {
+  const 켬 = !!고름;
+  $('#homebar').hidden = 켬; $('#selbar').hidden = !켬; $('#pick').hidden = 켬; $('#selfoot').hidden = !켬;
+  if (!켬) return;
+  const n = 고름.size, 보일것 = 목록.filter(통과);
+  $('#selcnt').textContent = `${n}개 고름`;
+  $('#selall').textContent = 보일것.length && 보일것.every(d => 고름.has(d.id)) ? '다 풀기' : '다 고르기';
+  $('#seldel').textContent = n ? `${n}개 지우기` : '지우기';
+  $('#seldel').disabled = !n; $('#selgroup').disabled = !n;
+}
+function 묶음붙이기(ids, 이름) {
+  for (const id of ids) {
+    const d = 목록.find(x => x.id === id); if (!d) continue;
+    const 표 = 묶음들(d); if (표.includes(이름)) continue;
+    다리.setInfo(id, '묶음', [...표, 이름].join('\n'));
+  }
+}
+function 묶음넣기판() {
+  const ids = [...고름], 있는 = new Map();
+  for (const d of 목록) for (const g of 묶음들(d)) 있는.set(g, (있는.get(g) || 0) + 1);
+  판열기(`<h3>${ids.length}개를 어느 묶음에?</h3>
+    ${[...있는.keys()].sort((a, b) => a.localeCompare(b, 'ko')).map(g => `<button class="act" data-g="${글(g)}">${글(g)} <span class="흐림">· ${있는.get(g)}</span></button>`).join('')}
+    <div class="row"><input id="newgroup" type="text" maxlength="40" placeholder="새 묶음 이름 (예 : ○○교 점검)" enterkeyhint="done"></div>
+    <div class="row 끝줄"><span style="flex:1"></span><button class="btn plain" onclick="판닫기()">닫기</button><button class="btn" id="groupok">넣기</button></div>
+    <div class="판설명">묶음은 이름표만 — 파일은 그대로 · 한 파일이 여러 묶음에도 · 묶음 풀기는 칩을 길게</div>`);
+  const 넣기 = 이름 => {
+    이름 = String(이름 || '').replace(/\s+/g, ' ').trim(); if (!이름) return $('#newgroup').focus();
+    묶음붙이기(ids, 이름); 판닫기();
+    보기설정.방식 = '묶음'; 보기설정.묶음 = 이름; 보기저장();
+    고르기끝(); 목록그리기(); 칩(`「${이름}」 에 ${ids.length}개 넣음`);
+  };
+  $('#sheet').onclick = e => { const b = e.target.closest('[data-g]'); if (b) 넣기(b.dataset.g); };
+  $('#groupok').onclick = () => 넣기($('#newgroup').value);
+  $('#newgroup').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); 넣기($('#newgroup').value); } };
+}
+function 지우기판() {
+  const ids = [...고름], n = ids.length;
+  판열기(`<h3>${n}개를 지울까요?</h3>
+    <div class="판설명">· 앱 안 사본 · 펜 표시 · 쪽지 · 메모가 지워짐<br>· 카톡 · 내 파일의 원본은 그대로 · 되돌릴 수 없음</div>
+    <div class="row 끝줄"><span style="flex:1"></span><button class="btn plain" onclick="판닫기()">닫기</button><button class="btn 지움" id="delok">${n}개 지우기</button></div>`);
+  $('#delok').onclick = () => { for (const id of ids) 다리.remove(id); 판닫기(); 고르기끝(); 목록그리기(); 칩(`${n}개 지움`); };
+}
+function 묶음관리판(이름) {
+  const 들 = 목록.filter(d => 묶음들(d).includes(이름));
+  판열기(`<h3>묶음 · ${글(이름)} <span class="흐림">${들.length}</span></h3>
+    <div class="row"><input id="rename" type="text" maxlength="40"></div>
+    <div class="row 끝줄"><button class="btn plain warn" id="ungroup">묶음 풀기 (이름표만 지움)</button><span style="flex:1"></span><button class="btn" id="renameok">이름 바꾸기</button></div>`);
+  $('#rename').value = 이름;
+  const 바꿈 = 새 => {
+    for (const d of 들) { const 표 = 묶음들(d).filter(g => g !== 이름); if (새 && !표.includes(새)) 표.push(새); 다리.setInfo(d.id, '묶음', 표.join('\n')); }
+    보기설정.묶음 = 새 || '모두'; 보기저장(); 판닫기(); 목록그리기();
+  };
+  $('#ungroup').onclick = () => 바꿈('');
+  $('#renameok').onclick = () => { const 새 = $('#rename').value.replace(/\s+/g, ' ').trim(); if (새 && 새 !== 이름) 바꿈(새); else 판닫기(); };
 }
 // 목록 딱지 색 — 첫 화면 · ZIP 안 목록(zipview.js) 같이 씀
 function 딱지(ext) {
@@ -108,12 +232,60 @@ function 때(ms) {
 }
 function 크기(b) { return b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(b / 1024)) + 'KB'; }
 
+let 길게됨 = false;
 $('#list').addEventListener('click', e => {
+  if (길게됨) { 길게됨 = false; return; }                          // 길게 눌러 고르기를 시작한 그 손가락
+  const 권 = e.target.closest('[data-권함]');
+  if (권) {
+    const w = 권.dataset.w;
+    if (권.dataset.권함 === '만들기') { 묶음붙이기(목록.filter(d => String(d.name || '').includes(w)).map(d => d.id), w); 보기설정.묶음 = w; 보기저장(); 목록그리기(); 칩(`「${w}」 묶음 만듦`); }
+    else { try { const a = JSON.parse(localStorage.getItem('묶음권함닫음') || '[]'); a.push(w); localStorage.setItem('묶음권함닫음', JSON.stringify(a)); } catch (x) {} 목록그리기(); }
+    return;
+  }
+  if (고름) {
+    const 모 = e.target.closest('[data-sec]');
+    const it = e.target.closest('.item');
+    if (모) {
+      const 칸 = 모.parentElement.nextElementSibling, ids = [...칸.querySelectorAll('.item')].map(x => x.dataset.id), 다 = ids.every(id => 고름.has(id));
+      ids.forEach(id => (다 ? 고름.delete(id) : 고름.add(id)));
+    } else if (it) 고름.has(it.dataset.id) ? 고름.delete(it.dataset.id) : 고름.add(it.dataset.id);
+    return 목록그리기();
+  }
   const m = e.target.closest('[data-more]');
   if (m) { e.stopPropagation(); 더보기판(m.dataset.more); return; }
   const it = e.target.closest('.item');
   if (it) 열기(it.dataset.id, true);
 });
+// 길게 누르기 — 목록 줄 : 고르기 시작 · 묶음 칩 : 묶음 이름 바꾸기 · 풀기
+function 길게(틀, 고름표, 할일) {
+  let 시계 = 0, 처음 = null;
+  틀.addEventListener('pointerdown', e => {
+    const t = e.target.closest(고름표); if (!t) return;
+    처음 = [e.clientX, e.clientY];
+    시계 = setTimeout(() => { 시계 = 0; 길게됨 = true; 할일(t); setTimeout(() => (길게됨 = false), 800); }, 550);
+  });
+  const 그만 = e => { if (시계 && (!처음 || e.type !== 'pointermove' || Math.hypot(e.clientX - 처음[0], e.clientY - 처음[1]) > 10)) { clearTimeout(시계); 시계 = 0; } };
+  for (const k of ['pointerup', 'pointercancel', 'pointermove', 'pointerleave']) 틀.addEventListener(k, 그만);
+  틀.addEventListener('contextmenu', e => { if (e.target.closest(고름표)) e.preventDefault(); });
+}
+길게($('#list'), '.item', it => { navigator.vibrate?.(15); 고르기시작(it.dataset.id); });
+길게($('#kinds'), '.칩[data-k]', c => { const k = c.dataset.k; if (보기설정.방식 === '묶음' && k !== '모두' && k !== '＋') 묶음관리판(k); });
+$('#kinds').addEventListener('click', e => {
+  if (길게됨) { 길게됨 = false; return; }
+  const m = e.target.closest('[data-m]');
+  if (m) { 보기설정.방식 = m.dataset.m; 보기저장(); return 목록그리기(); }
+  const c = e.target.closest('[data-k]'); if (!c) return;
+  if (c.dataset.k === '＋') { 고르기시작(); return 칩('묶음에 넣을 파일을 고른 뒤 아래 「묶음에 넣기」'); }
+  보기설정[보기설정.방식 === '형식' ? '형식' : '묶음'] = c.dataset.k; 보기저장(); 목록그리기();
+});
+$('#selbtn').addEventListener('click', () => 고르기시작());
+$('#seldone').addEventListener('click', 고르기끝);
+$('#selall').addEventListener('click', () => {
+  const 보일것 = 목록.filter(통과), 다 = 보일것.every(d => 고름.has(d.id));
+  보일것.forEach(d => (다 ? 고름.delete(d.id) : 고름.add(d.id))); 목록그리기();
+});
+$('#seldel').addEventListener('click', () => 고름?.size && 지우기판());
+$('#selgroup').addEventListener('click', () => 고름?.size && 묶음넣기판());
 $('#pick').addEventListener('click', () => 다리.pickFile());
 
 function 판열기(html) { $('#sheet').onclick = null; $('#sheet').innerHTML = '<div class="grab"></div>' + html; $('#sheet').hidden = false; $('#dim').hidden = false; }
@@ -162,6 +334,7 @@ $('#memofold').addEventListener('click', () => 쪽지보이기(true));
 let 지금 = null;           // { id, ext, 쪽들, 쪽수 }
 // 덧 (10-04 · ZIP) : 깊이 — ZIP 에서 꺼내 연 문서는 1 (ZIP 속 ZIP 은 2 …) · 압축에서 — 뒤로 가면 돌아갈 ZIP { id, 폴더, 깊이 } · 폴더 — ZIP 을 다시 열 때 그 폴더로
 function 열기(id, 쌓기, 덧 = {}) {
+  고름 = null;                                       // 고르기 중에 새 파일을 받으면 고르기는 끝
   목록그리기();
   const d = 목록.find(x => x.id === id);
   if (!d) { 알림판('목록에 없음 → 다시 받아 열기'); return; }
@@ -281,7 +454,7 @@ $('#layers').addEventListener('click', () => {
 
 function 문서주소(d) { if (d.주소) return d.주소; return 폰 ? `/doc/${encodeURIComponent(d.id)}` : 웹 ? `doc/${encodeURIComponent(d.id)}` : `_시험문서/${encodeURIComponent(d.name)}`; }   // 웹은 일꾼(sw.js)이 보관함에서 내줌
 function 도구보이기(목록) {
-  if (목록.length) 목록 = [...목록, 'share'];                  // 연 문서는 모두 「보내기」 (v0.7)
+  if (목록.length) 목록 = [...목록, ...(목록.includes('pen') ? ['copy'] : []), 'share'];   // 연 문서는 모두 「보내기」 (v0.7) · 펜이 되는 문서는 「복사」 도 (10-04)
   for (const b of document.querySelectorAll('#tools .tool')) b.hidden = !목록.includes(b.id);   // 단추를 더해도 빠짐없이 (10-03 도면 단추가 엑셀에 보이던 것)
   $('#tools').hidden = 목록.length === 0;
 }
@@ -814,6 +987,55 @@ function 보내기판() {
   $('#sheet').onclick = e => { const b = e.target.closest('[data-k]'); if (b) { 판닫기(); 사본보내기(b.dataset.k); } };
 }
 $('#share').addEventListener('click', 보내기판);
+
+// ④-6b 복사 (10-04 · 목업 승인) — 지금 보이는 쪽(그림 · 도면)에 표시를 입혀 클립보드로 → 다른 앱에서 길게 눌러 붙여넣기 · 원본은 안 고침
+//   보내기 「지금 보는 쪽만 → 그림」 과 같은 그림 · 클립보드는 png
+async function 지금그림캔버스() {
+  const d = 지금.d, id = 지금.id, 번호표 = { n: 0, 목록: [] };
+  let c = null;
+  if (지금.쪽수) {
+    const n = 보는쪽(), pg = $('#pages').children[n], pw = +pg.dataset.pw;
+    const 주소 = await 쪽길().쪽(id, n, Math.round(Math.min(2000, Math.max(800, pw * 2)))), im = await 보내기.그림받기(주소); 그림주소놓기(주소);
+    c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽[n], d.메모);
+    보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === String(n)), { 돌: 지금.돌림, 번호표, 쪽: n + 1 });
+  } else if (지금.그림) {
+    c = 보내기.쪽캔버스($('#pages .pg img'), 지금.돌림, 지금.표시.쪽['0'], d.메모);
+    보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === '0'), { 돌: 지금.돌림, 번호표 });
+  } else if (도면판) {
+    c = 도면판.내보내기(false);
+    보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === 'd'), { 도면: c.점, 배율: c.배율, 번호표 });
+    if (d.메모) 보내기.쪽지상자(c.getContext('2d'), c.width, d.메모);
+  }
+  if (c && 번호표.목록.length) c = 보내기.아래목록(c, 번호표.목록);
+  return c;
+}
+$('#copy').addEventListener('click', () => {
+  if (!지금 || 보내는중) return;
+  const 긴칩 = 말 => { 칩(말); clearTimeout(칩시계); 칩시계 = setTimeout(() => ($('#chip').hidden = true), 2800); };
+  const 그림약속 = (async () => {
+    const c = await 지금그림캔버스(); if (!c) throw new Error('복사할 그림 없음');
+    const b = await new Promise(ok => c.toBlob(ok, 'image/png')); c.width = c.height = 0;
+    if (!b) throw new Error('그림 만들기 실패 (메모리)');
+    return b;
+  })();
+  칩('복사하는 중…');
+  const 끝 = p => p.then(() => 긴칩('📋 복사됨 → 다른 앱에서 길게 눌러 붙여넣기'), e => { $('#chip').hidden = true; 알림(`<b>복사 안 됨</b><div class="sm">${글(e?.message || e)} → 「보내기」 로</div>`); });
+  if (다리.copyImage) {                                             // 아이폰 웹앱 · PC — 누른 손가락 안에서 «바로» 불러야 함 (그림은 약속으로 넘김)
+    let p; try { p = Promise.resolve(다리.copyImage(그림약속)); } catch (e) { p = Promise.reject(e); }
+    return 끝(p);
+  }
+  끝(그림약속.then(async b => {                                     // 갤럭시 — 껍데기가 클립보드에
+    if (!다리.copyBegin) throw new Error('앱이 옛 판 → 새 판 설치');
+    const 바이트 = new Uint8Array(await b.arrayBuffer());
+    if (!다리.copyBegin()) throw new Error('파일을 못 만듦');
+    for (let i = 0; i < 바이트.length; i += 393216) {
+      const 덩 = 바이트.subarray(i, i + 393216); let s = '';
+      for (let k = 0; k < 덩.length; k += 8192) s += String.fromCharCode.apply(null, 덩.subarray(k, k + 8192));
+      if (!다리.copyChunk(btoa(s))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+    }
+    if (!다리.copyEnd()) throw new Error('클립보드에 못 넣음');
+  }));
+});
 function 표시한쪽들() {
   const s = new Set(Object.keys(지금.표시.쪽).filter(k => k !== 'd'));
   for (const m of 지금.표시.메모 || []) if (m.k !== 'd') s.add(m.k);
@@ -997,6 +1219,10 @@ function 목록으로() {
 }
 $('#back').addEventListener('click', () => history.state?.v === 'viewer' ? history.back() : 목록으로());
 window.addEventListener('popstate', () => {
+  if (고름) {                                        // 고르기 중 뒤로 = 판 닫기 · 고르기 끝 (10-04)
+    if (!$('#sheet').hidden) { 판닫기(); history.pushState({ v: '고르기' }, ''); return; }
+    고름 = null; return 목록그리기();
+  }
   if (압축보기.뒤로()) return;                       // ZIP 폴더 · ZIP 에서 꺼내 연 문서 (10-04 · zipview.js)
   if (!$('#thumbs').hidden || (history.state?.v === 'viewer' && 지금)) { 쪽목록닫기(); 판닫기(); return; }   // 쪽 목록에서 뒤로 → 보기 화면
   if (!$('#sheet').hidden) { 판닫기(); if (지금) history.pushState({ v: 'viewer', 깊이: 지금.깊이 }, ''); return; }

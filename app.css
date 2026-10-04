@@ -334,3 +334,33 @@ i.형광점 { border-radius:7px !important; }
 /* 아래 큰 단추 · 서명 줄 뒤 — 목록이 비치지 않게 바탕색으로 덮음 (10-04 실측) */
 #home::after { content:''; position:fixed; left:0; right:0; bottom:0; height:calc(124px + env(safe-area-inset-bottom)); background:linear-gradient(to bottom, transparent, var(--bg) 38%); pointer-events:none; z-index:1; }
 .fab, .서명 { z-index:2; }
+
+/* 10-04 · 목업 넷 (복사_목업.html) — 형식 · 묶음 칩 줄 · 고르기 · 아래 두 단추 · 권함 카드 */
+.칩줄 { flex:none; display:flex; gap:6px; align-items:center; overflow-x:auto; padding:0 14px 8px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.칩줄::-webkit-scrollbar { display:none; }
+.칩줄 .칩 { flex:none; padding:6px 12px; border-radius:999px; background:var(--surface2); color:var(--sub); font-size:13px; font-weight:600; white-space:nowrap; }
+.칩줄 .칩 i { font-style:normal; opacity:.75; margin-left:2px; }
+.칩줄 .칩.on { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; }
+.나눔 { flex:none; display:flex; background:var(--surface2); border-radius:10px; padding:2px; }
+.나눔 button { padding:5px 10px; border-radius:8px; font-size:13px; font-weight:600; color:var(--sub); }
+.나눔 button.on { background:var(--surface); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+#homebar .tovideo, #selbar .tovideo { padding:8px 12px; font-size:13px; }
+#selbar h1 { font-size:18px; }
+.sec { display:flex; align-items:center; }
+.sec span { flex:1; }
+.모두칸 { font-size:13px; font-weight:600; color:var(--sub); padding:2px 6px; }
+.모두칸.on { color:var(--accent-ink); font-weight:700; }
+.고름칸 { width:24px; height:24px; border-radius:50%; border:2px solid var(--faint); flex:none; display:grid; place-items:center; font-size:13px; color:transparent; }
+.고름칸.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.selfoot { position:fixed; left:16px; right:16px; bottom:calc(38px + env(safe-area-inset-bottom)); display:flex; gap:8px; z-index:2; }
+.selfoot button { flex:1; padding:14px; border-radius:var(--radius); font-weight:700; font-size:15px; background:var(--surface2); color:var(--text); }
+.selfoot button:disabled { opacity:.45; }
+.selfoot .지움, .btn.지움 { background:#d70015; color:#fff; }
+@media (prefers-color-scheme: dark) { .selfoot .지움, .btn.지움 { background:#ff453a; } }
+.권함 { background:var(--accent-soft); border-radius:var(--radius); padding:11px 13px; font-size:14px; margin:4px 0 10px; }
+.권함 b { color:var(--accent-ink); }
+.권함단추 { display:flex; gap:6px; margin-top:8px; }
+.권함단추 .칩 { padding:6px 12px; border-radius:999px; font-size:13px; font-weight:600; background:var(--surface); color:var(--sub); }
+.권함단추 .칩.on { color:var(--accent-ink); font-weight:700; }
+.빈칸글 { text-align:center; color:var(--sub); font-size:14px; padding:30px 0; }
+.흐림 { color:var(--sub); font-weight:400; }
