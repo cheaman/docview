@@ -9,7 +9,7 @@
 'use strict';
 (() => {
   const 최대 = 30;
-  const 덧칸 = ['메모', '돌림', '묶음', '자리', '즐겨', '책갈피'];   // 문서마다 덧붙이는 칸 · 묶음(10-04) 과업 이름표 · 자리 · 즐겨 · 책갈피(10-05)
+  const 덧칸 = ['메모', '돌림', '묶음', '자리', '즐겨', '책갈피', '축척'];   // 문서마다 덧붙이는 칸 · 묶음(10-04) 과업 이름표 · 자리 · 즐겨 · 책갈피(10-05)
   const 읽기 = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
   const 쓰기 = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); return true; } catch (e) { return false; } };
   const 표열쇠 = id => 'docview-marks-' + id;

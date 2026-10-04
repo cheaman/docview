@@ -845,7 +845,7 @@ function 그림열기(d) {
     쪽모양(pg); 쪽표시그리기(pg);
     지금.그림 = true;
     $('#vsub').textContent = `그림 · ${w}×${h}`;
-    도구보이기(['rot', 'pen']);
+    도구보이기(['rot', 'pen', 'measure']);
   };
   img.onerror = () => {
     if (지금?.id !== d.id) return;
@@ -1114,7 +1114,7 @@ async function pdf열기(d) {
   지금.쪽수 = 정보.pages;
   const ppt = 지금.쪽길 === PPT길;
   $('#vsub').textContent = ppt ? `PPT · 슬라이드 ${정보.pages}장` : `PDF · ${정보.pages}쪽`;
-  도구보이기([...(정보.pages < 2 ? [] : ['goto']), 'find', 'rot', 'pen', ...(ppt ? ['pptmode'] : [])]);
+  도구보이기([...(정보.pages < 2 ? [] : ['goto']), 'find', 'rot', 'pen', ...(ppt ? ['pptmode'] : ['measure'])]);
   if (ppt) 피피티모드글();
   const 틀 = $('#pages');
   틀.innerHTML = 정보.sizes.map(([w, h], i) =>
@@ -1744,7 +1744,7 @@ function 재기글(o) {
   // 단위를 「없음」 으로 저장한 도면이 많음 (10-03 실물 넷 중 둘) → 숫자 그대로 + «mm 라면» 을 곁들임
   const 길 = v => 단 ? `${수(v)} ${단}${단 !== 'm' && 미터 ? ` (${수(v * 미터)} m)` : ''}` : `${수(v)} <span class="흐림">(mm 라면 ${수(v / 1000)} m)</span>`;
   let t;
-  if (!o.점수) t = '재고 싶은 곳을 톡 → 점 · 끝점에 붙음' + (단 ? ` · 단위 ${단}` : ' · 도면에 단위 없음');
+  if (!o.점수) t = o.안내 || ('재고 싶은 곳을 톡 → 점 · 끝점에 붙음' + (단 ? ` · 단위 ${단}` : ' · 도면에 단위 없음'));
   else if (o.점수 === 1) t = '다음 점을 톡';
   else {
     t = `거리 <b>${길(o.마지막)}</b>`;
@@ -1754,15 +1754,135 @@ function 재기글(o) {
   $('#meastext').innerHTML = t;
   $('#measundo').disabled = !o.점수;
 }
-function 재기끄기() { $('#measbar').hidden = true; $('#measure').classList.remove('on'); 도면판?.재기켬(false); }
+function 재기끄기() { $('#measbar').hidden = true; $('#measure').classList.remove('on'); 도면판?.재기켬(false); 쪽재기끔(); }
 $('#measure').addEventListener('click', () => {
   if (!$('#measbar').hidden) return 재기끄기();
   if (펜.켬) 펜끄기();
+  if (!도면판) return 쪽재기시작();
   $('#measbar').hidden = false; $('#measure').classList.add('on');
   도면판?.재기켬(true);
 });
-$('#measundo').addEventListener('click', () => 도면판?.재기빼기());
-$('#measclear').addEventListener('click', () => 도면판?.재기새로());
+$('#measundo').addEventListener('click', () => { if (쪽재.켬) { 쪽재.점.pop(); return 쪽재다시(); } 도면판?.재기빼기(); });
+$('#measclear').addEventListener('click', () => { if (쪽재.켬) { 쪽재.점 = []; return 쪽재다시(); } 도면판?.재기새로(); });
+
+// ④-5b PDF · 그림 축척 재기 (0.9.7 · 목업 1_읽을거리\축척재기_목업.html 승인 「둘 다」 · 「화면 + 표시로 남기기」)
+//   축척 = 쪽 단위(PDF pt · 그림 화소) 하나가 실제 몇 mm 인가 (k) · recent 줄 「축척」 칸 { k, 글 }
+//   PDF 는 1:S 를 고르면 k = 25.4/72 × S (용지 크기 그대로일 때) · 줄여 찍은 도면 · 그림은 «아는 치수로 맞추기» (두 점 + 길이)
+//   점은 한 쪽 안에서만 (다른 쪽을 톡 하면 새로) · 끝점 붙기 없음 (PDF 선을 못 읽음) · 화면에만 (저장 안 함) — 「남기기」 = 펜 표시로
+const 쪽재 = { 켬: false, 점: [], 쪽: null, 맞춤: false };
+const PT_MM = 25.4 / 72;
+function 축척읽기() { try { return JSON.parse(지금?.d?.축척 || 'null'); } catch (e) { return null; } }
+function 축척쓰기(o) { 지금.d.축척 = o ? JSON.stringify(o) : undefined; 다리.setInfo(지금.id, '축척', o ? JSON.stringify(o) : ''); }
+async function 도면축척찾기() {                              // 이 문서 글에서 「S=1:50」 · 「축척 1:100」 · 「SCALE 1/200」
+  const o = await 글읽기(지금.d).catch(() => null); if (!o || o.없음) return null;
+  const 글들 = o.쪽 ? [o.쪽[보는쪽()] || '', ...o.쪽] : [o.글 || ''];
+  for (const t of 글들) { const m = /(?:S|축척|SCALE)\s*[=:：]?\s*1\s*[:/：]\s*([\d,]{1,6})/i.exec(t); if (m) return +m[1].replace(/,/g, ''); }
+  return null;
+}
+async function 축척판(맞춤뒤) {
+  const PDF임 = 지금.쪽수 && 지금.ext === 'pdf', 지금축 = 축척읽기(), 찾음 = PDF임 ? await 도면축척찾기() : null;
+  const 칩들 = [10, 20, 30, 50, 100, 200, 300, 500, 1000];
+  if (찾음 && !칩들.includes(찾음)) 칩들.push(찾음);
+  const 고른 = 지금축?.S || 찾음;
+  판열기(`<h3>축척 <span class="흐림">· 이 문서</span></h3>
+    ${PDF임 ? `<div class="축척칩" id="scalechips">${칩들.sort((a, b) => a - b).map(S => `<button data-s="${S}" class="${S === 고른 ? 'on' : ''}">1:${S}${S === 찾음 ? ' <i>(도면 글)</i>' : ''}</button>`).join('')}</div>
+    <div class="row"><input id="scalein" type="number" inputmode="numeric" placeholder="직접 — 1 : ○○" min="1"></div>
+    <div class="판설명">용지 크기 그대로인 PDF 일 때 · 원도를 줄여 찍었으면 → 아는 치수로 맞추기</div>` : '<div class="판설명">그림은 용지 크기를 몰라 → 아는 치수로 맞추기 (도면 속 치수 양 끝을 톡 → 길이)</div>'}
+    <div class="row 끝줄"><button class="btn plain" id="scalecal">아는 치수로 맞추기</button><span style="flex:1"></span>${PDF임 ? '<button class="btn" id="scaleok">이 축척으로 재기</button>' : ''}</div>`);
+  let S = 고른 || null;
+  $('#scalechips')?.addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; S = +b.dataset.s; $('#scalein').value = ''; $('#scalechips').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
+  if ($('#scaleok')) $('#scaleok').onclick = () => {
+    const 직접 = +$('#scalein').value; if (직접 > 0) S = 직접;
+    if (!S) return $('#scalein').focus();
+    축척쓰기({ k: PT_MM * S, S, 글: `1:${S}` }); 판닫기(); 쪽재기켜기(); 맞춤뒤?.();
+  };
+  $('#scalecal').onclick = () => { 판닫기(); 쪽재기켜기(true); };
+}
+function 쪽재기시작() { if (!지금?.쪽수 && !지금?.그림) return; if (!축척읽기()) return 축척판(); 쪽재기켜기(); }
+function 쪽재기켜기(맞춤) {
+  Object.assign(쪽재, { 켬: true, 점: [], 쪽: null, 맞춤: !!맞춤 });
+  지금.단위 = 'm';                                            // 재기글 은 m 로 (값도 m 로 넘김 · 짧게)
+  $('#measbar').hidden = false; $('#measure').classList.add('on');
+  $('#measscale').hidden = false; $('#meassave').hidden = 맞춤;
+  쪽재다시();
+}
+function 쪽재기끔() { if (!쪽재.켬 && !$('#pages').querySelector('svg.재기층')) return; Object.assign(쪽재, { 켬: false, 점: [], 쪽: null, 맞춤: false }); $('#measscale').hidden = true; $('#meassave').hidden = true; $('#pages').querySelectorAll('svg.재기층').forEach(e => e.remove()); }
+function 쪽재값() {                                          // 지금 점들 → 거리 · 합 · 넓이 (mm)
+  const pg = $('#pages').querySelector(`.pg[data-n="${쪽재.쪽}"]`), W = +pg?.dataset.pw || 1, H = +pg?.dataset.ph || 1, k = 축척읽기()?.k || 1;
+  const P = 쪽재.점.map(([x, y]) => [x * W, y * H]); let 합 = 0, 마지막 = 0, a = 0;
+  for (let i = 1; i < P.length; i++) { 마지막 = Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]) * k; 합 += 마지막; }
+  if (P.length >= 3) { for (let i = 0; i < P.length; i++) { const j = (i + 1) % P.length; a += P[i][0] * P[j][1] - P[j][0] * P[i][1]; } a = Math.abs(a) / 2 * k * k; }
+  return { 점수: P.length, 마지막, 합, 면적: a, P, W, H, pg };
+}
+function 쪽재다시() {
+  $('#pages').querySelectorAll('svg.재기층').forEach(e => e.remove());
+  const 축 = 축척읽기();
+  $('#measscale').textContent = 축 ? 축.글 : '축척';
+  if (쪽재.맞춤) {
+    const n = 쪽재.점.length;
+    $('#meastext').innerHTML = n === 0 ? '아는 치수 한쪽 끝을 톡' : n === 1 ? '다른 쪽 끝을 톡' : '길이를 적어 주세요';
+    $('#measundo').disabled = !n;
+  } else {
+    const v = 쪽재값();
+    재기글({ 점수: v.점수, 마지막: v.마지막 / 1000, 합: v.합 / 1000, 면적: v.면적 / 1e6, 안내: `톡 → 점 · 축척 ${축?.글 || '?'}` });
+    $('#meassave').disabled = v.점수 < 2;
+  }
+  if (!쪽재.점.length) return;
+  const { P, W, H, pg } = 쪽재값(); if (!pg) return;
+  const b = pg.getBoundingClientRect(), 화 = (지금.돌림 & 1 ? b.height : b.width) || 1, u = W / 화, 색 = 쪽재.맞춤 ? '#e8743b' : '#00b7ff', k = 축?.k || 1;
+  const 수글 = v => v.toLocaleString('ko-KR', { maximumFractionDigits: v >= 100 ? 0 : 2 });
+  let h = `<svg class="재기층" viewBox="0 0 ${W} ${H}">`;
+  if (P.length >= 3 && !쪽재.맞춤) h += `<polygon points="${P.map(p => p.join(',')).join(' ')}" fill="rgba(0,183,255,.13)" stroke="none"/>`;
+  h += `<polyline points="${P.map(p => p.join(',')).join(' ')}" fill="none" stroke="${색}" stroke-width="${2.2 * u}" stroke-linecap="round"/>`;
+  for (const [x, y] of P) h += `<rect x="${x - 4.5 * u}" y="${y - 4.5 * u}" width="${9 * u}" height="${9 * u}" fill="#fff" stroke="${색}" stroke-width="${1.6 * u}"/>`;
+  if (!쪽재.맞춤) for (let i = 1; i < P.length; i++) {
+    const [x0, y0] = P[i - 1], [x1, y1] = P[i], L = Math.hypot(x1 - x0, y1 - y0) * k; if (Math.hypot(x1 - x0, y1 - y0) / u < 30) continue;
+    const 글m = L >= 1000 ? `${수글(L / 1000)} m` : `${수글(L)} mm`, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    h += `<text x="${cx}" y="${cy}" transform="rotate(${-지금.돌림 * 90} ${cx} ${cy}) translate(0 ${-9 * u})" font-size="${12.5 * u}" font-weight="700" text-anchor="middle" fill="#005b80" stroke="#fff" stroke-width="${3.5 * u}" paint-order="stroke" font-family="Pretendard, system-ui, sans-serif">${글m}</text>`;
+  }
+  pg.querySelector('.속').insertAdjacentHTML('beforeend', h + '</svg>');
+}
+$('#pages').addEventListener('click', e => {
+  if (!쪽재.켬 || 펜.켬) return;
+  const p = e.target.closest('.pg'); if (!p || !p.dataset.pw) return;
+  const q = 쪽좌표(p, e.clientX, e.clientY);
+  if (쪽재.쪽 !== p.dataset.n) { 쪽재.쪽 = p.dataset.n; 쪽재.점 = []; }
+  if (쪽재.맞춤 && 쪽재.점.length >= 2) 쪽재.점 = [];
+  쪽재.점.push([네자리(q.x), 네자리(q.y)]); 쪽재다시();
+  if (쪽재.맞춤 && 쪽재.점.length === 2) 맞춤판();
+});
+function 맞춤판() {                                         // 두 점 사이 실제 길이 → k
+  const pg = $('#pages').querySelector(`.pg[data-n="${쪽재.쪽}"]`), W = +pg.dataset.pw, H = +pg.dataset.ph, [[x0, y0], [x1, y1]] = 쪽재.점, 쪽길이 = Math.hypot((x1 - x0) * W, (y1 - y0) * H);
+  판열기(`<h3>두 점 사이 실제 길이</h3>
+    <div class="row"><input id="calin" type="number" inputmode="decimal" placeholder="예 : 3000" min="0"><div class="seg" id="calunit"><button data-v="1" class="on">mm</button><button data-v="1000">m</button></div></div>
+    <div class="판설명" id="calnote">치수 글 그대로 적기 (3,000 → 3000)</div>
+    <div class="row 끝줄"><button class="btn plain" id="calre">다시 찍기</button><span style="flex:1"></span><button class="btn" id="calok">이 축척으로</button></div>`);
+  let 단 = 1;
+  const 미리 = () => { const v = +$('#calin').value * 단; if (!(v > 0)) return; const k = v / 쪽길이; $('#calnote').textContent = 지금.ext === 'pdf' ? `→ 1 : ${(k / PT_MM).toFixed(1)} (용지 그대로라면)` : `→ 그림 1 화소 = ${k.toFixed(2)} mm`; };
+  $('#calin').oninput = 미리;
+  $('#calunit').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; 단 = +b.dataset.v; $('#calunit').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); 미리(); };
+  $('#calre').onclick = () => { 판닫기(); 쪽재.점 = []; 쪽재다시(); };
+  $('#calok').onclick = () => {
+    const v = +$('#calin').value * 단; if (!(v > 0) || !(쪽길이 > 0)) return $('#calin').focus();
+    const k = v / 쪽길이, S = 지금.ext === 'pdf' ? k / PT_MM : null;
+    축척쓰기({ k, ...(S ? { S: Math.round(S) } : {}), 글: S ? `맞춤 1:${S >= 100 ? Math.round(S) : S.toFixed(1)}` : '맞춤' });
+    판닫기(); 쪽재기켜기(); 칩('축척을 맞춤 → 이제 톡 해서 재기');
+  };
+  setTimeout(() => $('#calin').focus(), 60);
+}
+$('#measscale').addEventListener('click', () => 축척판());
+$('#meassave').addEventListener('click', () => {                // 잰 것을 펜 표시로 (펜 획 + 글 획) → 보내기 사본에도
+  const v = 쪽재값(); if (v.점수 < 2 || !v.pg) return;
+  const 열쇠 = 쪽재.쪽, b = v.pg.getBoundingClientRect(), 화 = (지금.돌림 & 1 ? b.height : b.width) || 1, 굵 = +(3 / 화).toPrecision(4);
+  const 수글 = x => x.toLocaleString('ko-KR', { maximumFractionDigits: x >= 100 ? 0 : 2 }), 길 = x => (x >= 1000 ? `${수글(x / 1000)} m` : `${수글(x)} mm`);
+  const 점 = 쪽재.점.flat(), 끝 = 쪽재.점.length - 1, [ax, ay] = 쪽재.점[끝 - 1], [bx, by] = 쪽재.점[끝];
+  표시바꿈(열쇠, { 더함: { c: 'r', w: 굵, p: 점 } });
+  const 글 = v.점수 === 2 ? 길(v.마지막) : `합 ${길(v.합)}${v.면적 ? ` · 넓이 ${수글(v.면적 / 1e6)} m²` : ''}`;
+  const fs = +(15 / 화).toPrecision(4), 비 = +v.pg.dataset.pw / +v.pg.dataset.ph, 폭 = 글폭(글) * fs;   // 글 가운데를 잰 선 가운데 위에 · 쪽 안으로
+  const gx = Math.min(0.99 - 폭, Math.max(0.01, (ax + bx) / 2 - 폭 / 2)), gy = Math.max(0.01, (ay + by) / 2 - 24 / 화 * 비);
+  표시바꿈(열쇠, { 더함: { c: 'r', w: fs, p: [네자리(gx), 네자리(gy)], t: 글, r: 지금.돌림 } });
+  쪽재.점 = []; 쪽재다시(); 칩('표시로 남김 → 펜으로 고치기 · 지우기 · 보내기 사본에도');
+});
 $('#measoff').addEventListener('click', 재기끄기);
 
 // ④-6 보내기 (v0.7) — 표시 입힌 사본 (share.js) 또는 원본 그대로
