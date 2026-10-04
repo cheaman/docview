@@ -295,3 +295,14 @@ i.형광점 { border-radius:7px !important; }
 .홈안내 { display:flex; align-items:center; gap:6px; margin:8px 12px 0; padding:10px 6px 10px 14px; border-radius:14px; background:var(--accent-soft); font-size:14px; line-height:1.5; }
 .홈안내 b { color:var(--accent); }
 .홈안내 .ib { margin-left:auto; width:34px; height:34px; font-size:20px; color:var(--sub); }
+
+/* ZIP 보기 (10-04 · zipview.js) — 첫 화면 목록과 같은 줄 모양 · 위에 길(폴더) · 요약 · 갤럭시는 「모두 풀어 저장」 */
+.b-zip { background:#b7791f; } .b-dir { background:#e3a72f; font-size:22px; }
+.zipbox { padding-top:8px; }
+.zip길 { display:flex; flex-wrap:wrap; align-items:center; gap:2px 4px; margin:2px 4px 6px; font-size:15px; }
+.zip길 button { padding:6px 8px; border-radius:10px; background:var(--surface2); color:var(--text); font-size:15px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.zip길 button.지금 { background:var(--accent-soft); color:var(--accent); font-weight:700; }
+.zip길 .사이 { color:var(--sub); }
+.zip요약 { font-size:13px; color:var(--sub); margin:0 6px 10px; }
+.zip모두 { display:block; width:100%; margin:0 0 12px; padding:13px 14px; border-radius:var(--radius); background:var(--accent); color:var(--on-accent); font-weight:700; font-size:15px; text-align:center; }
+.zipbox .item .s .자물쇠 { color:#c0392b; }

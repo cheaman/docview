@@ -52,7 +52,16 @@ const 다리 = window.Android || window.웹다리 || {
   shareChunk: b => { window.마지막보냄.조각.push(b); return true; },
   shareEnd: m => { const o = window.마지막보냄; o.꼴 = m; o.바이트 = Uint8Array.from(atob(o.조각.join('')), c => c.charCodeAt(0)); o.조각 = null; 알림판(`PC 시험 → 보낼 파일 「${o.이름}」 ${크기(o.바이트.length)} 만듦`); return true; },
   shareOriginal: id => { window.마지막보냄 = { 원본: id }; 알림판('PC 시험 → 원본 그대로 보내기'); return true; },
+  // ZIP 안 파일 꺼내기 (10-04) — PC 는 이 창 안에만 (blob 주소) · 폰 저장은 window.마지막저장 에 두고 알림만
+  addBytes: async (n, from, b) => {
+    const id = 'x' + Date.now() + Math.random().toString(36).slice(2, 5), ext = (n.match(/\.([^.]+)$/)?.[1] || '').toLowerCase();
+    PC꺼낸것.unshift({ id, name: n, ext, from, when: Date.now(), size: b.length, 주소: URL.createObjectURL(new Blob([b])) });
+    return id;
+  },
+  saveBytes: (폴더, n, b) => { (window.마지막저장 ||= []).push({ 폴더, 이름: n, 크기: b.length }); return true; },
 };
+const PC꺼낸것 = [];
+if (!window.Android && !window.웹다리) { const 옛 = 다리.recent; 다리.recent = () => JSON.stringify([...PC꺼낸것, ...JSON.parse(옛())]); }
 const $ = s => document.querySelector(s);
 const 글 = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -74,15 +83,18 @@ function 목록그리기() {
     h += `<div class="sec">${k}</div>`;
     for (const d of arr) {
       const ext = (d.ext || '').toLowerCase();
-      const 딱지 = ['pdf', 'hwp', 'hwpx', 'doc', 'docx', 'txt'].includes(ext) ? ext : ['html', 'htm'].includes(ext) ? 'html' : ['xls', 'xlsx'].includes(ext) ? 'xls' : 그림형식.includes(ext) ? 'img' : ['dxf', 'dwg'].includes(ext) ? 'cad' : 'etc';
       h += `<div class="item" data-id="${글(d.id)}" role="button">
-        <span class="badge b-${딱지}">${글((ext || '?').toUpperCase().slice(0, 4))}</span>
+        <span class="badge b-${딱지(ext)}">${글((ext || '?').toUpperCase().slice(0, 4))}</span>
         <div class="t"><div class="n">${글(d.name)}</div><div class="s">${글(d.from || '')} · ${때(d.when)}${d.size > 0 ? ' · ' + 크기(d.size) : ''}</div>${d.메모 ? `<div class="memo">📝 ${글(d.메모.split('\n')[0].slice(0, 60))}</div>` : ''}</div>
         <button class="more" data-more="${글(d.id)}" aria-label="더 보기"><svg class="ico"><use href="#i-more"/></svg></button>
       </div>`;
     }
   }
   $('#list').innerHTML = h;
+}
+// 목록 딱지 색 — 첫 화면 · ZIP 안 목록(zipview.js) 같이 씀
+function 딱지(ext) {
+  return ['pdf', 'hwp', 'hwpx', 'doc', 'docx', 'txt'].includes(ext) ? ext : ['html', 'htm'].includes(ext) ? 'html' : ['xls', 'xlsx'].includes(ext) ? 'xls' : 그림형식.includes(ext) ? 'img' : ['dxf', 'dwg'].includes(ext) ? 'cad' : 압축형식.includes(ext) ? 'zip' : 'etc';
 }
 function 때(ms) {
   const d = new Date(ms), 오늘 = new Date();
@@ -143,7 +155,8 @@ $('#memofold').addEventListener('click', () => 쪽지보이기(true));
 
 // ③ 열기 ──────────────────────────────────────────
 let 지금 = null;           // { id, ext, 쪽들, 쪽수 }
-function 열기(id, 쌓기) {
+// 덧 (10-04 · ZIP) : 깊이 — ZIP 에서 꺼내 연 문서는 1 (ZIP 속 ZIP 은 2 …) · 압축에서 — 뒤로 가면 돌아갈 ZIP { id, 폴더, 깊이 } · 폴더 — ZIP 을 다시 열 때 그 폴더로
+function 열기(id, 쌓기, 덧 = {}) {
   목록그리기();
   const d = 목록.find(x => x.id === id);
   if (!d) { 알림판('목록에 없음 → 다시 받아 열기'); return; }
@@ -156,20 +169,23 @@ function 열기(id, 쌓기) {
   $('#vsub').textContent = (d.ext || '').toUpperCase();
   $('#note').hidden = true; $('#pages').querySelectorAll('img').forEach(그림놓기); $('#pages').innerHTML = ''; $('#tools').hidden = true;
   찾기닫기(); $('#flowin').innerHTML = ''; $('#flow').hidden = true; $('#reader').hidden = false;
-  $('#cadbox').hidden = true; 도면판?.끝(); 도면판 = null;
+  $('#cadbox').hidden = true; 도면판?.끝(); 도면판 = null; $('#zipbox').hidden = true;
   표시마저쓰기(); 펜끄기(); 재기끄기(); 쪽목록닫기(); 되돌릴것 = [];
   $('#cadbox').style.background = '';
   확대 = 1; $('#pages').style.width = '100%'; 미끄럼멈춤();
-  지금 = { id, ext: (d.ext || '').toLowerCase(), d, 돌림: (Number(d.돌림) || 0) & 3, 표시: 표시읽기(id) };
+  지금 = { id, ext: (d.ext || '').toLowerCase(), d, 돌림: (Number(d.돌림) || 0) & 3, 표시: 표시읽기(id), 깊이: 덧.깊이 || 0, 압축에서: 덧.압축에서 };
   손모드(); 쪽지보이기();
   if (지금.표시.메모?.length) setTimeout(() => 지금?.id === id && 칩(`📝 메모 ${지금.표시.메모.length}개`), 700);
   if (지금.ext === 'pdf') return pdf열기(d);
   if (['txt', 'docx', 'hwpx', 'hwp', 'doc', 'xlsx', 'xls', 'html', 'htm'].includes(지금.ext)) return 글문서열기(d);
   if (그림형식.includes(지금.ext)) return 그림열기(d);
   if (지금.ext === 'dxf') return 도면열기(d);
+  if (지금.ext === 'zip') return 압축보기.열기(d, 덧.폴더);
   if (지금.ext === 'dwg') return 알림('<b>DWG → 못 엶</b><div class="sm">오토데스크 비공개 형식 · 보낸 분께 PDF 나 DXF 로 받기</div>');
-  알림(`<b>아직 못 여는 형식 · ${글((지금.ext || '?').toUpperCase())}</b><div class="sm">되는 것 → PDF · 한글 · 워드 · TXT · 엑셀 · HTML · 그림 · DXF</div>`);
+  if (압축형식.includes(지금.ext)) return 알림(`<b>${글(지금.ext.toUpperCase())} 압축 → 못 엶 (ZIP 만 됨)</b><div class="sm">알집(ALZ · EGG) · 7Z · RAR 은 보낸 분께 ZIP 으로 받기</div>`);
+  알림(`<b>아직 못 여는 형식 · ${글((지금.ext || '?').toUpperCase())}</b><div class="sm">되는 것 → PDF · 한글 · 워드 · TXT · 엑셀 · HTML · 그림 · DXF · ZIP</div>`);
 }
+const 압축형식 = ['zip', 'alz', 'egg', '7z', 'rar'];
 // ③-3 그림 — 브라우저가 그리는 것은 원본 그대로, HEIC 등은 껍데기가 JPEG 로 바꿔 줌 (/img/) · 확대 · 밀기는 PDF 와 같음
 const 그림형식 = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif'];
 const 영상형식 = ['mp4', 'mov', 'm4v', 'webm', '3gp', 'mkv'];
@@ -257,7 +273,7 @@ $('#layers').addEventListener('click', () => {
   $('#층없음').onclick = () => { 층들.forEach(l => (l.켜짐 = false)); $('#sheet').querySelectorAll('input[data-k]').forEach(i => (i.checked = false)); 다시(); };
 });
 
-function 문서주소(d) { return 폰 ? `/doc/${encodeURIComponent(d.id)}` : 웹 ? `doc/${encodeURIComponent(d.id)}` : `_시험문서/${encodeURIComponent(d.name)}`; }   // 웹은 일꾼(sw.js)이 보관함에서 내줌
+function 문서주소(d) { if (d.주소) return d.주소; return 폰 ? `/doc/${encodeURIComponent(d.id)}` : 웹 ? `doc/${encodeURIComponent(d.id)}` : `_시험문서/${encodeURIComponent(d.name)}`; }   // 웹은 일꾼(sw.js)이 보관함에서 내줌
 function 도구보이기(목록) {
   if (목록.length) 목록 = [...목록, 'share'];                  // 연 문서는 모두 「보내기」 (v0.7)
   for (const b of document.querySelectorAll('#tools .tool')) b.hidden = !목록.includes(b.id);   // 단추를 더해도 빠짐없이 (10-03 도면 단추가 엑셀에 보이던 것)
@@ -953,7 +969,7 @@ function 손뗌(e) {
 // ⑥ 뒤로 · 시작 ───────────────────────────────────
 function 목록으로() {
   찾기닫기(); 표시마저쓰기(); 펜끄기(); 재기끄기(); 쪽목록닫기(); $('#memobox').hidden = true;
-  $('#viewer').hidden = true; $('#home').hidden = false; 판닫기();
+  $('#viewer').hidden = true; $('#home').hidden = false; 판닫기(); $('#zipbox').hidden = true; $('#zipbox').innerHTML = ''; 압축보기.비우기();
   if (지켜보기) 지켜보기.disconnect();
   for (const img of $('#flowin').querySelectorAll('img[src^="blob:"]')) URL.revokeObjectURL(img.src);
   $('#pages').querySelectorAll('img').forEach(그림놓기); $('#pages').innerHTML = ''; $('#flowin').innerHTML = ''; 지금 = null;
@@ -962,8 +978,9 @@ function 목록으로() {
 }
 $('#back').addEventListener('click', () => history.state?.v === 'viewer' ? history.back() : 목록으로());
 window.addEventListener('popstate', () => {
+  if (압축보기.뒤로()) return;                       // ZIP 폴더 · ZIP 에서 꺼내 연 문서 (10-04 · zipview.js)
   if (!$('#thumbs').hidden || (history.state?.v === 'viewer' && 지금)) { 쪽목록닫기(); 판닫기(); return; }   // 쪽 목록에서 뒤로 → 보기 화면
-  if (!$('#sheet').hidden) { 판닫기(); if (지금) history.pushState({ v: 'viewer' }, ''); return; }
+  if (!$('#sheet').hidden) { 판닫기(); if (지금) history.pushState({ v: 'viewer', 깊이: 지금.깊이 }, ''); return; }
   목록으로();
 });
 

@@ -46,10 +46,12 @@
     if (i > 0 && i < 이름.length - 1) return 이름.slice(i + 1).toLowerCase();
     return { 'application/pdf': 'pdf', 'text/plain': 'txt', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/heic': 'heic', 'text/html': 'html' }[꼴] || '';
   };
-  async function 받기(파일) {                          // 갤럭시 껍데기의 copyIn + addRecent 와 같음
-    const id = String(Date.now()), ext = 확장자(파일.name, 파일.type);
+  let 마지막id = 0;
+  async function 받기(파일, 어디서 = '내 파일') {         // 갤럭시 껍데기의 copyIn + addRecent 와 같음
+    마지막id = Math.max(Date.now(), 마지막id + 1);       // ZIP 에서 잇달아 꺼내도 번호가 안 겹치게
+    const id = String(마지막id), ext = 확장자(파일.name, 파일.type);
     await 파일넣기(id, { blob: 파일, type: 파일.type || '', name: 파일.name });
-    const 새 = { id, name: 파일.name || '이름 없는 문서', ext, from: '내 파일', when: Date.now(), size: 파일.size };
+    const 새 = { id, name: 파일.name || '이름 없는 문서', ext, from: 어디서, when: Date.now(), size: 파일.size };
     const 옛 = 목록(), a = [새];
     for (const o of 옛) {
       const 같음 = o.name === 새.name && o.size === 새.size;   // 같은 파일을 또 받으면 쪽지 · 돌림 · 펜 표시를 새 줄로
@@ -105,7 +107,7 @@
       i.type = 'file';
       // 아이폰 파일 고르기는 애플이 모르는 확장자(.hwp · .dxf 등)를 흐리게 막음 → 아이폰은 제한 없이 (못 여는 형식은 앱이 알림)
       if (!/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document))
-        i.accept = '.pdf,.hwp,.hwpx,.doc,.docx,.txt,.xls,.xlsx,.html,.htm,.dxf,.dwg,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,application/pdf,image/*,text/plain';
+        i.accept = '.pdf,.hwp,.hwpx,.doc,.docx,.txt,.xls,.xlsx,.html,.htm,.dxf,.dwg,.zip,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,application/pdf,image/*,text/plain';
       i.onchange = async () => {
         const f = i.files?.[0]; if (!f) return;
         try { 대기 = JSON.stringify({ id: await 받기(f) }); }
@@ -115,6 +117,8 @@
       i.click();
     },
     shareBytes: (이름, 꼴, 바이트) => 보낼판(new File([바이트], 이름, { type: 꼴 })),
+    // ZIP 에서 꺼낸 파일을 받은 문서처럼 (10-04 · zipview.js) → 새 id
+    addBytes: (이름, 어디서, 바이트) => 받기(new File([바이트], 이름, { type: '' }), 어디서),
     shareOriginal: id => {
       const d = 목록().find(o => o.id === id);
       파일꺼내기(id).then(것 => {
@@ -225,7 +229,7 @@
   addEventListener('DOMContentLoaded', () => {
     const how = document.querySelector('#empty .how');
     if (how) how.innerHTML = `<div><b>카톡에서</b> → 파일 누름 → <span class="pill">공유</span> → <span class="pill">파일에 저장</span> → 여기서 <b>파일 열기</b></div>
-      <div><b>되는 파일</b> → PDF · 한글(HWP · HWPX) · 워드(DOC · DOCX) · TXT · 엑셀 · HTML · 그림(HEIC 포함) · 도면(DXF)</div>`;
+      <div><b>되는 파일</b> → PDF · 한글(HWP · HWPX) · 워드(DOC · DOCX) · TXT · 엑셀 · HTML · 그림(HEIC 포함) · 도면(DXF) · 압축(ZIP — 풀지 않고 안을 봄)</div>`;
     const 홈에있음 = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
     if (!홈에있음 && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
       const 띠 = document.createElement('div'); 띠.className = '홈안내';
