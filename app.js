@@ -277,13 +277,78 @@ function 길게(틀, 고름표, 할일) {
   틀.addEventListener('pointerdown', e => {
     const t = e.target.closest(고름표); if (!t) return;
     처음 = [e.clientX, e.clientY];
-    시계 = setTimeout(() => { 시계 = 0; 길게됨 = true; 할일(t); setTimeout(() => (길게됨 = false), 800); }, 550);
+    const 손 = { x: e.clientX, y: e.clientY, 마우스: e.pointerType === 'mouse' };
+    시계 = setTimeout(() => { 시계 = 0; 길게됨 = true; 할일(t, 손); setTimeout(() => (길게됨 = false), 800); }, 550);
   });
   const 그만 = e => { if (시계 && (!처음 || e.type !== 'pointermove' || Math.hypot(e.clientX - 처음[0], e.clientY - 처음[1]) > 10)) { clearTimeout(시계); 시계 = 0; } };
   for (const k of ['pointerup', 'pointercancel', 'pointermove', 'pointerleave']) 틀.addEventListener(k, 그만);
   틀.addEventListener('contextmenu', e => { if (e.target.closest(고름표)) e.preventDefault(); });
 }
-길게($('#list'), '.item', it => { navigator.vibrate?.(15); 고르기시작(it.dataset.id); });
+길게($('#list'), '.item', (it, 손) => { navigator.vibrate?.(15); 고르기시작(it.dataset.id); 문지름시작(it.dataset.id, true, 손); });
+
+// 문질러 고르기 (10-05 · 전무님 「아이폰 · 갤럭시처럼 문질러서 선택」)
+//   고르기 중 줄 왼쪽 동그라미에 손가락을 대고 위아래로 끌기 · 또는 길게 눌러 고르기를 시작한 손가락을 떼지 않고 끌기
+//   → 처음 줄부터 손가락 아래 줄까지 모두 같은 상태(처음 동그라미가 비었으면 고름 · 차 있었으면 풂) · 되돌아가면 원래대로
+//   목록 위 · 아래 끝에 가면 저절로 밀림 · 끄는 동안 목록은 안 밀림 (손가락이 닿은 그 요소에 touchmove 막기를 붙임 —
+//   길게 누르면 목록을 새로 그려 그 요소가 문서에서 빠져도 그 요소로 계속 옴)
+let 문지름 = null, 밀기틀 = 0;
+function 문지름시작(id, 목표, 손) {
+  문지름 = { id, 끝id: id, 목표, 스냅: new Set(고름), 켬: false, 처음: [손.x, 손.y], 마지막: [손.x, 손.y], 마우스: !!손.마우스 };
+}
+function 문지름적용() {
+  const 줄들 = [...$('#list').querySelectorAll('.item')], ids = 줄들.map(x => x.dataset.id);
+  const a = ids.indexOf(문지름.id), b = ids.indexOf(문지름.끝id); if (a < 0 || b < 0) return;
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  줄들.forEach((it, k) => {
+    const id = ids[k], 켬 = k >= lo && k <= hi ? 문지름.목표 : 문지름.스냅.has(id);
+    켬 ? 고름.add(id) : 고름.delete(id);
+    it.querySelector('.고름칸')?.classList.toggle('on', 켬);
+  });
+  고르기판갱신();
+}
+function 문지름따라() {                                  // 손가락이 아래 단추 줄 · 머리 위에 있어도 목록 안쪽 높이로 당겨 잼 (저절로 밀릴 때)
+  const r = $('#list').getBoundingClientRect(), y = Math.min(Math.max(문지름.마지막[1], r.top + 4), Math.min(r.bottom, innerHeight) - 100);
+  const it = document.elementFromPoint(r.left + r.width / 2, y)?.closest('#list .item');
+  if (it) 문지름.끝id = it.dataset.id;
+  문지름적용();
+}
+function 문지름움직임(x, y) {
+  if (!문지름 || !고름) return;
+  문지름.마지막 = [x, y];
+  if (!문지름.켬) {
+    if (Math.hypot(x - 문지름.처음[0], y - 문지름.처음[1]) < 6) return;
+    문지름.켬 = true; navigator.vibrate?.(8);
+    const 밀기 = () => {                              // 위 · 아래 끝 가까이면 저절로 밀기
+      if (!문지름) return;
+      const L = $('#list'), r = L.getBoundingClientRect(), y = 문지름.마지막[1], 아래 = Math.min(r.bottom, innerHeight) - 130;
+      const v = y < r.top + 50 ? -Math.min(18, (r.top + 50 - y) / 3 + 3) : y > 아래 ? Math.min(18, (y - 아래) / 3 + 3) : 0;
+      if (v) { L.scrollTop += v; 문지름따라(); }
+      밀기틀 = requestAnimationFrame(밀기);
+    };
+    밀기틀 = requestAnimationFrame(밀기);
+  }
+  문지름따라();
+}
+function 문지름끝() {
+  if (!문지름) return;
+  const 켬 = 문지름.켬; 문지름 = null; cancelAnimationFrame(밀기틀);
+  if (켬) { 길게됨 = true; setTimeout(() => (길게됨 = false), 400); 목록그리기(); }   // 손을 뗀 자리의 click 은 버림 · 「모두」 칸도 다시
+}
+$('#list').addEventListener('pointerdown', e => {
+  if (!고름 || 문지름) return;
+  const 칸 = e.target.closest('.고름칸'); if (!칸) return;
+  const id = 칸.closest('.item').dataset.id;
+  문지름시작(id, !고름.has(id), { x: e.clientX, y: e.clientY, 마우스: e.pointerType === 'mouse' });
+});
+$('#list').addEventListener('touchstart', e => {
+  const t = e.target;
+  const 막기 = ev => { if (!문지름) return; ev.preventDefault(); const p = ev.touches[0]; if (p) 문지름움직임(p.clientX, p.clientY); };
+  const 끝 = () => { t.removeEventListener('touchmove', 막기); t.removeEventListener('touchend', 끝); t.removeEventListener('touchcancel', 끝); 문지름끝(); };
+  t.addEventListener('touchmove', 막기, { passive: false });
+  t.addEventListener('touchend', 끝); t.addEventListener('touchcancel', 끝);
+}, { passive: true });
+window.addEventListener('pointermove', e => { if (문지름?.마우스 && e.pointerType === 'mouse') 문지름움직임(e.clientX, e.clientY); });
+window.addEventListener('pointerup', e => { if (문지름?.마우스 && e.pointerType === 'mouse') 문지름끝(); });
 길게($('#kinds'), '.칩[data-k]', c => { const k = c.dataset.k; if (보기설정.방식 === '묶음' && k !== '모두' && k !== '＋') 묶음관리판(k); });
 $('#kinds').addEventListener('click', e => {
   if (길게됨) { 길게됨 = false; return; }
