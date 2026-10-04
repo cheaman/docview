@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta name="docview-ver" content="1005-065901">
+<meta name="docview-ver" content="1005-071413">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <link rel="stylesheet" href="app.css">
@@ -78,6 +78,7 @@
   <header class="bar" id="vbar">
     <button class="ib" id="back" aria-label="뒤로"><svg class="ico"><use href="#i-back"/></svg></button>
     <div class="t"><div class="n" id="vname"></div><div class="s" id="vsub"></div></div>
+    <button class="ib 밤-b" id="nightbtn" aria-label="밤 보기" hidden>🌙</button>
     <button class="ib bmk-b" id="bmk" aria-label="책갈피" hidden><svg class="ico"><use href="#i-mark"/></svg></button>
     <button class="ib memo-b" id="memo" aria-label="쪽지"><svg class="ico"><use href="#i-memo"/></svg></button>
   </header>
@@ -156,6 +157,7 @@
   </header>
   <div id="tkinds" class="칩줄" hidden></div>
   <main id="tgrid" class="tgrid"></main>
+  <main id="tlist" class="tlist" hidden></main>
 </section>
 
 <div id="chip" class="chip" hidden></div><!-- 칩은 목록 · 보기 둘 다에서 보이게 밖으로 (10-05) -->
@@ -176,6 +178,7 @@
 <script src="ppt.js"></script>
 <script src="share.js"></script>
 <script src="zipview.js"></script>
+<script src="pdfmok.js"></script>
 <script src="web.js"></script>
 <script src="app.js"></script>
 <script src="memo.js"></script>

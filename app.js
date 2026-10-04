@@ -812,7 +812,7 @@ function 열기(id, 쌓기, 덧 = {}) {
   $('#cadbox').style.background = '';
   확대 = 1; $('#pages').style.width = '100%'; 미끄럼멈춤();
   지금 = { id, ext: (d.ext || '').toLowerCase(), d, 돌림: (Number(d.돌림) || 0) & 3, 표시: 표시읽기(id), 깊이: 덧.깊이 || 0, 압축에서: 덧.압축에서 };
-  손모드(); 쪽지보이기();
+  손모드(); 쪽지보이기(); 밤적용(); 화면켜둠(true);
   if (지금.표시.메모?.length) setTimeout(() => 지금?.id === id && 칩(`📝 메모 ${지금.표시.메모.length}개`), 700);
   if (지금.ext === 'pdf') return pdf열기(d);
   if (지금.ext === 'pptx' && !PPT글로) { 지금.쪽길 = PPT길; return pdf열기(d); }
@@ -995,7 +995,7 @@ function 글설정입히기() {
   안.style.lineHeight = 글설정.줄;
   안.classList.toggle('바탕-종이', 글설정.바탕 === '종이');
   안.classList.toggle('글꼴-명조', 글설정.글꼴 === '명조');
-  안.classList.toggle('바탕-어둡게', 글설정.바탕 === '어둡게');
+  안.classList.toggle('바탕-어둡게', 글설정.바탕 === '어둡게' || 밤지금);   // 밤 보기 (0.9.8)
   try { localStorage.setItem('글설정', JSON.stringify(글설정)); } catch (e) {}
 }
 $('#size').addEventListener('click', () => {
@@ -1127,6 +1127,7 @@ async function pdf열기(d) {
   틀.querySelectorAll('.pg').forEach(p => 지켜보기.observe(p));
   $('#reader').scrollTop = 0;
   자리되살리기(); 책갈피단추(); 글적어두기(d);
+  지금.목차 = []; setTimeout(() => { const 그 = 지금; if (그?.id === d.id) 목차얻기(d).then(m => { if (그 === 지금) 지금.목차 = m || []; }); }, 800);   // ⑯ (0.9.8)
 }
 // 그릴 너비 — 옆으로 돌렸으면 쪽 틀의 «높이» 가 원래 쪽의 너비
 function 쪽너비(p) {
@@ -1617,7 +1618,7 @@ function 쪽목록열기() {
     const n = Number(pg.dataset.n);
     return `<button class="썸${n === 지금쪽 ? ' 지금' : ''}" data-n="${n}"><div class="썸틀" data-pw="${pg.dataset.pw}" data-ph="${pg.dataset.ph}"><div class="속"></div></div><span class="썸번호">${n + 1}${지금.표시.쪽[n] ? ' <i>✏</i>' : ''}${(지금.표시.메모 || []).some(m => m.k === String(n)) ? ' 📝' : ''}${책.has(n) ? ' <b class="책">🔖</b>' : ''}</span></button>`;
   }).join('');
-  쪽목록책만 = false; 쪽목록칩();
+  쪽목록보기 = '모두'; 쪽목록칩();
   그리드.querySelectorAll('.썸틀').forEach(쪽모양);
   쪽목록지켜봄?.disconnect();
   쪽목록지켜봄 = new IntersectionObserver(es => {
@@ -1633,15 +1634,48 @@ function 쪽목록열기() {
   그리드.querySelectorAll('.썸틀').forEach(t => 쪽목록지켜봄.observe(t));
   그리드.querySelector('.지금')?.scrollIntoView({ block: 'center' });
 }
-// 쪽 목록 위 칩 「모든 쪽 · 🔖 3」 (10-05) — 책갈피가 있을 때만
-let 쪽목록책만 = false;
-function 쪽목록칩() {
-  const 책 = new Set(책갈피쪽들()), k = $('#tkinds');
-  k.hidden = !책.size; if (!책.size) 쪽목록책만 = false;
-  k.innerHTML = `<button class="칩${쪽목록책만 ? '' : ' on'}" data-t="모두">모든 ${단위()} <i>${지금.쪽수}</i></button><button class="칩${쪽목록책만 ? ' on' : ''}" data-t="책">🔖 <i>${책.size}</i></button>`;
-  $('#tgrid').querySelectorAll('.썸').forEach(b => (b.style.display = 쪽목록책만 && !책.has(Number(b.dataset.n)) ? 'none' : ''));
+// 쪽 목록 위 칩 「모든 쪽 · 🔖 3 · 목차 18 · 표시 7」 (10-05 · 0.9.8) — 있는 것만
+//   목차 = PDF 책갈피(⑯ · 갤럭시 pdfmok.js · 웹 pdf.js) · 표시 = 쪽지 · 책갈피 · 펜 · 메모 · 글 · 도장을 쪽 차례로 (⑥)
+let 쪽목록보기 = '모두';
+function 표시목록() {
+  const 줄 = [], 단 = 단위();
+  if (지금.d.메모) 줄.push({ 아: '📝', 글: '쪽지 · ' + 지금.d.메모.split('\n')[0].slice(0, 40), 쪽: null });
+  for (const n of 책갈피쪽들()) 줄.push({ 아: '🔖', 글: '책갈피', 쪽: n });
+  for (const [k, 획들] of Object.entries(지금.표시.쪽 || {})) {
+    if (k === 'd') continue; const n = Number(k), 셈 = {};
+    for (const g of 획들) {
+      if (g.f === 's') 줄.push({ 아: '印', 색: '#d6262b', 글: `도장 · ${g.s || ''} ${g.날 || ''}`, 쪽: n });
+      else if (g.f === 'g') 줄.push({ 아: '✍', 글: '서명', 쪽: n });
+      else if (g.t != null) 줄.push({ 아: 'T', 색: 색값(g.c), 글: '글 · ' + g.t, 쪽: n });
+      else { const 이름 = g.f ? '도형' : 형광인가(g.c) ? '형광' : '펜'; 셈[이름] = (셈[이름] || 0) + 1; }
+    }
+    const 요약 = Object.entries(셈).map(([a, b]) => `${a} ${b}`).join(' · ');
+    if (요약) 줄.push({ 아: '✎', 색: '#e5383b', 글: 요약, 쪽: n });
+  }
+  for (const m of 지금.표시.메모 || []) if (m.k !== 'd') 줄.push({ 아: '📍', 글: '메모 · ' + String(m.글 || '').split('\n')[0].slice(0, 40), 쪽: Number(m.k) });
+  줄.sort((a, b) => (a.쪽 ?? -1) - (b.쪽 ?? -1));
+  return 줄.map(x => ({ ...x, 쪽글: x.쪽 == null ? '문서' : `${x.쪽 + 1}${단}` }));
 }
-$('#tkinds').addEventListener('click', e => { const c = e.target.closest('[data-t]'); if (!c) return; 쪽목록책만 = c.dataset.t === '책'; 쪽목록칩(); $('#tgrid').scrollTop = 0; });
+function 쪽목록칩() {
+  const 책 = new Set(책갈피쪽들()), 목 = 지금.목차 || [], 표 = 표시목록(), k = $('#tkinds');
+  if ((쪽목록보기 === '책' && !책.size) || (쪽목록보기 === '목차' && !목.length) || (쪽목록보기 === '표시' && !표.length)) 쪽목록보기 = '모두';
+  const 칩 = (t, 글) => `<button class="칩${쪽목록보기 === t ? ' on' : ''}" data-t="${t}">${글}</button>`;
+  k.innerHTML = 칩('모두', `모든 ${단위()} <i>${지금.쪽수}</i>`) + (책.size ? 칩('책', `🔖 <i>${책.size}</i>`) : '') + (목.length ? 칩('목차', `목차 <i>${목.length}</i>`) : '') + (표.length ? 칩('표시', `표시 <i>${표.length}</i>`) : '');
+  k.hidden = !책.size && !목.length && !표.length;
+  const 목록칸 = 쪽목록보기 === '목차' || 쪽목록보기 === '표시';
+  $('#tgrid').hidden = 목록칸; $('#tlist').hidden = !목록칸;
+  $('#tgrid').querySelectorAll('.썸').forEach(b => (b.style.display = 쪽목록보기 === '책' && !책.has(Number(b.dataset.n)) ? 'none' : ''));
+  if (쪽목록보기 === '목차') $('#tlist').innerHTML = 목.map(x => `<button class="목줄 깊${Math.min(3, x.깊이)}" data-n="${x.쪽 ?? ''}"><span class="글">${글(x.글)}</span><span class="쪽번">${x.쪽 == null ? '' : `${x.쪽 + 1}${단위()}`}</span></button>`).join('');
+  if (쪽목록보기 === '표시') $('#tlist').innerHTML = 표.map(x => `<button class="목줄" data-n="${x.쪽 ?? ''}"><span class="아"${x.색 ? ` style="color:${x.색}"` : ''}>${x.아}</span><span class="글">${글(x.글)}</span><span class="쪽번">${x.쪽글}</span></button>`).join('');
+}
+$('#tkinds').addEventListener('click', e => { const c = e.target.closest('[data-t]'); if (!c) return; 쪽목록보기 = c.dataset.t; 쪽목록칩(); $('#tgrid').scrollTop = 0; $('#tlist').scrollTop = 0; });
+$('#tlist').addEventListener('click', e => { const b = e.target.closest('[data-n]'); if (!b) return; if (b.dataset.n === '') { 쪽목록닫기(); if (history.state?.v === 'thumbs') history.back(); return 쪽지보이기(); } 쪽목록에서(Number(b.dataset.n)); });
+async function 목차얻기(d) {                                 // ⑯ PPT 는 없음 · 웹은 pdf.js · 갤럭시 · PC 는 pdfmok.js
+  if (String(d.ext).toLowerCase() !== 'pdf') return [];
+  if (PDF길.목차) return PDF길.목차(d.id).catch(() => []);
+  const r = await fetch(문서주소(d)).catch(() => null); if (!r?.ok) return [];
+  return PDF목차.읽기(new Uint8Array(await r.arrayBuffer()));
+}
 function 쪽목록닫기() {
   if ($('#thumbs').hidden) return;
   $('#thumbs').hidden = true; 쪽목록지켜봄?.disconnect();
@@ -2132,14 +2166,49 @@ function 손뗌(e) {
 판.addEventListener('touchend', 손뗌);
 판.addEventListener('touchcancel', e => { 집기 = null; 끌기 = null; if (긋기) 긋기끝(true); $('#pages').style.transform = ''; 손모드(); });
 
+// ⑤-2 밤 보기 (0.9.8 ⑰ · 전무님 「계절별 일몰 후부터 일출 전까지 자동」) — 인터넷 · 위치 권한 없이 대전(36.35N 127.38E) 기준
+//   해 뜨고 지는 시각은 NOAA 간이식 (한국 안 어디든 ±10분) · 밤이면 PDF · PPT 쪽을 어둡게(색 뒤집기 · 사진 · 그림 문서는 그대로) · 글 문서는 어두운 바탕
+//   밤에만 머리에 🌙 — 누르면 이 문서만 잠깐 끔 / 다시 켬 · 5분마다 다시 봄
+// ⑤-3 화면 안 꺼짐 (0.9.8 ⑮) — 문서를 보는 동안 늘 · 목록으로 나가면 폰 설정대로 (갤럭시 껍데기 keepScreen · 웹 Wake Lock)
+function 해시각(t = new Date()) {
+  const 위 = 36.35 * Math.PI / 180, 경 = 127.38, y = t.getUTCFullYear(), 처음 = Date.UTC(y, 0, 1), N = Math.floor((t - 처음) / 864e5) + 1;
+  const γ = 2 * Math.PI / 365 * (N - 1), 식 = 229.18 * (0.000075 + 0.001868 * Math.cos(γ) - 0.032077 * Math.sin(γ) - 0.014615 * Math.cos(2 * γ) - 0.040849 * Math.sin(2 * γ));
+  const 적 = 0.006918 - 0.399912 * Math.cos(γ) + 0.070257 * Math.sin(γ) - 0.006758 * Math.cos(2 * γ) + 0.000907 * Math.sin(2 * γ) - 0.002697 * Math.cos(3 * γ) + 0.00148 * Math.sin(3 * γ);
+  const ha = Math.acos(Math.cos(90.833 * Math.PI / 180) / (Math.cos(위) * Math.cos(적)) - Math.tan(위) * Math.tan(적)) * 180 / Math.PI;
+  const 날 = Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
+  return { 뜸: new Date(날 + (720 - 4 * (경 + ha) - 식) * 6e4), 짐: new Date(날 + (720 - 4 * (경 - ha) - 식) * 6e4) };
+}
+function 밤인가(t = new Date()) {                            // 한국 날짜 기준으로 그날 해를 봄
+  const 한 = new Date(t.getTime() + 9 * 36e5), { 뜸, 짐 } = 해시각(new Date(Date.UTC(한.getUTCFullYear(), 한.getUTCMonth(), 한.getUTCDate(), 3)));
+  return t < 뜸 || t >= 짐;
+}
+let 밤지금 = false; const 밤끔 = new Set();
+function 밤적용() {
+  const 밤 = 밤인가(), 켬 = 밤 && !!지금 && !밤끔.has(지금.id);
+  if (켬 === 밤지금 && $('#nightbtn').hidden === !밤) return;
+  밤지금 = 켬;
+  $('#viewer').classList.toggle('밤', 켬);
+  $('#nightbtn').hidden = !밤 || !지금; $('#nightbtn').classList.toggle('on', 켬);
+  if (!$('#flow').hidden) 글설정입히기();
+}
+$('#nightbtn').addEventListener('click', () => { if (!지금) return; 밤끔.has(지금.id) ? 밤끔.delete(지금.id) : 밤끔.add(지금.id); 밤적용(); 칩(밤지금 ? '🌙 밤 보기 켬' : '밤 보기 끔 (이 문서만)'); });
+setInterval(밤적용, 300000);
+let 화면잠금 = null;
+async function 화면켜둠(켬) {
+  try { 다리.keepScreen?.(!!켬); } catch (e) {}
+  if (!('wakeLock' in navigator)) return;
+  try { if (켬 && !화면잠금 && document.visibilityState === 'visible') { 화면잠금 = await navigator.wakeLock.request('screen'); 화면잠금.addEventListener('release', () => (화면잠금 = null)); } else if (!켬 && 화면잠금) { await 화면잠금.release(); 화면잠금 = null; } } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !$('#viewer').hidden) 화면켜둠(true); });
+
 // ⑥ 뒤로 · 시작 ───────────────────────────────────
 function 목록으로() {
-  자리적기(); $('#resume').hidden = true;
+  자리적기(); $('#resume').hidden = true; 화면켜둠(false);
   찾기닫기(); 표시마저쓰기(); 펜끄기(); 재기끄기(); 쪽목록닫기(); $('#memobox').hidden = true;
   $('#viewer').hidden = true; $('#home').hidden = false; 판닫기(); $('#zipbox').hidden = true; $('#zipbox').innerHTML = ''; 압축보기.비우기();
   if (지켜보기) 지켜보기.disconnect();
   for (const img of $('#flowin').querySelectorAll('img[src^="blob:"]')) URL.revokeObjectURL(img.src);
-  $('#pages').querySelectorAll('img').forEach(그림놓기); $('#pages').innerHTML = ''; $('#flowin').innerHTML = ''; 지금 = null;
+  $('#pages').querySelectorAll('img').forEach(그림놓기); $('#pages').innerHTML = ''; $('#flowin').innerHTML = ''; 지금 = null; 밤적용();
   $('#plain').classList.remove('on'); $('#plainlab').textContent = '글자만';
   목록그리기();
 }

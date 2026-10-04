@@ -196,6 +196,14 @@
       return URL.createObjectURL(b);
     }),
     놓기: u => { if (typeof u === 'string' && u.startsWith('blob:')) URL.revokeObjectURL(u); },
+    // 목차 (0.9.8 ⑯) — pdf.js 책갈피 → [{ 글, 쪽, 깊이 }]
+    async 목차(id) {
+      const doc = await 문서(id), ol = await doc.getOutline().catch(() => null), 목 = [];
+      const 쪽 = async dest => { try { if (typeof dest === 'string') dest = await doc.getDestination(dest); if (!Array.isArray(dest)) return null; const r = dest[0]; return typeof r === 'number' ? r : await doc.getPageIndex(r); } catch (e) { return null; } };
+      const 걷기 = async (items, 깊이) => { for (const it of items || []) { if (목.length >= 800) return; 목.push({ 글: String(it.title || '').replace(/\s+/g, ' ').trim(), 쪽: await 쪽(it.dest), 깊이 }); if (깊이 < 6) await 걷기(it.items, 깊이 + 1); } };
+      await 걷기(ol, 0);
+      return 목.filter(x => x.글);
+    },
     // 쪽마다 글 (0.9.6 · 전체 찾기)
     async 글(id) {
       const doc = await 문서(id), pages = [];
