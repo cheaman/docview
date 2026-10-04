@@ -9,6 +9,7 @@
 'use strict';
 (() => {
   const 최대 = 30;
+  const 덧칸 = ['메모', '돌림', '묶음', '자리', '즐겨', '책갈피'];   // 문서마다 덧붙이는 칸 · 묶음(10-04) 과업 이름표 · 자리 · 즐겨 · 책갈피(10-05)
   const 읽기 = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
   const 쓰기 = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); return true; } catch (e) { return false; } };
   const 표열쇠 = id => 'docview-marks-' + id;
@@ -56,10 +57,10 @@
     for (const o of 옛) {
       const 같음 = o.name === 새.name && o.size === 새.size;   // 같은 파일을 또 받으면 쪽지 · 돌림 · 펜 표시를 새 줄로
       if (같음) {
-        for (const k of ['메모', '돌림', '묶음']) if (o[k] != null && 새[k] == null) 새[k] = o[k];
+        for (const k of 덧칸) if (o[k] != null && 새[k] == null) 새[k] = o[k];
         const 표 = localStorage.getItem(표열쇠(o.id)); if (표 && !localStorage.getItem(표열쇠(id))) 쓰기(표열쇠(id), 표);
       }
-      if (같음 || a.length >= 최대) { 파일빼기(o.id); 쓰기(표열쇠(o.id), null); } else a.push(o);
+      if (같음 || (a.length >= 최대 && !o.즐겨)) { 파일빼기(o.id); 쓰기(표열쇠(o.id), null); } else a.push(o);   // 즐겨찾기(⭐)는 30개를 넘어도 남김 (10-05)
     }
     목록쓰기(a);
     return id;
@@ -90,7 +91,7 @@
     recent: () => JSON.stringify(목록()),
     remove: id => { 목록쓰기(목록().filter(o => o.id !== id)); 파일빼기(id); 쓰기(표열쇠(id), null); },
     setInfo: (id, k, v) => {
-      if (!['메모', '돌림', '묶음'].includes(k)) return;   // 묶음 (10-04) : 과업 이름표 — 줄바꿈으로 여럿
+      if (!덧칸.includes(k)) return;
       const a = 목록();
       for (const o of a) if (o.id === id) { if (!v || (k === '돌림' && v === '0')) delete o[k]; else o[k] = String(v).slice(0, 20000); }
       목록쓰기(a);

@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta name="docview-ver" content="1004-225644">
+<meta name="docview-ver" content="1005-055121">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <link rel="stylesheet" href="app.css">
@@ -44,6 +44,7 @@
   <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/></symbol>
   <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3.5 16.5L16.5 3.5l4 4L7.5 20.5z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.2"/><path d="M15.5 8.5V6.2a2.2 2.2 0 0 0-2.2-2.2H6.2A2.2 2.2 0 0 0 4 6.2v7.1a2.2 2.2 0 0 0 2.2 2.2h2.3"/></symbol>
+  <symbol id="i-mark" viewBox="0 0 24 24"><path d="M7 3.5h10a1 1 0 0 1 1 1V21l-6-4.2L6 21V4.5a1 1 0 0 1 1-1z"/></symbol>
   <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="7" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="7" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="7" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="7" rx="1.2"/></symbol>
 </svg>
 
@@ -63,7 +64,7 @@
     </div>
   </div>
   <button id="pick" class="fab"><svg class="ico"><use href="#i-open"/></svg>파일 열기</button>
-  <div id="selfoot" class="selfoot" hidden><button id="selgroup">🏷 묶음에 넣기</button><button id="seldel" class="지움">지우기</button></div>
+  <div id="selfoot" class="selfoot" hidden><button id="selfav">⭐ 즐겨찾기</button><button id="selgroup">🏷 묶음</button><button id="seldel" class="지움">지우기</button></div>
   <div class="서명" id="sign">DSM · 34 문서보기</div>
 </section>
 
@@ -72,6 +73,7 @@
   <header class="bar" id="vbar">
     <button class="ib" id="back" aria-label="뒤로"><svg class="ico"><use href="#i-back"/></svg></button>
     <div class="t"><div class="n" id="vname"></div><div class="s" id="vsub"></div></div>
+    <button class="ib bmk-b" id="bmk" aria-label="책갈피" hidden><svg class="ico"><use href="#i-mark"/></svg></button>
     <button class="ib memo-b" id="memo" aria-label="쪽지"><svg class="ico"><use href="#i-memo"/></svg></button>
   </header>
   <header class="bar findbar" id="findbar" hidden>
@@ -87,7 +89,7 @@
   <main id="flow" class="flow" hidden><div id="flowin" class="flowin"></div></main>
   <main id="zipbox" class="list zipbox" hidden></main>
   <main id="cadbox" class="cadbox" hidden><canvas id="cad"></canvas><div id="cadnotes" class="cadnotes"></div></main>
-  <div id="chip" class="chip" hidden></div>
+  <div id="resume" class="이어봄" hidden><span id="resumetext"></span><button id="resumetop">처음부터</button></div>
   <div id="penpal" class="penpal" hidden></div>
   <div id="penbar" class="penbar" hidden>
     <div class="펜종류"><button data-m="펜">펜</button><button data-m="형광">형광</button><button data-m="메모">메모</button></div>
@@ -127,8 +129,11 @@
     <label class="field 쪽칸"><input id="tn" type="number" inputmode="numeric" placeholder="쪽 번호" min="1" enterkeyhint="go"></label>
     <button class="btn" id="tgo">이동</button>
   </header>
+  <div id="tkinds" class="칩줄" hidden></div>
   <main id="tgrid" class="tgrid"></main>
 </section>
+
+<div id="chip" class="chip" hidden></div><!-- 칩은 목록 · 보기 둘 다에서 보이게 밖으로 (10-05) -->
 
 <!-- ③-③ 아래에서 올라오는 판 (⋯ · 쪽 이동) -->
 <div id="dim" class="dim" hidden></div>

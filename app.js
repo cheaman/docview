@@ -129,22 +129,22 @@ function 목록그리기() {
   칩줄그리기();
   const 보일것 = 목록.filter(통과);
   const 오늘0 = new Date(); 오늘0.setHours(0, 0, 0, 0);
-  const 묶음 = { '오늘': [], '이번 주': [], '그 전': [] };
+  const 묶음 = { [즐겨이름]: [], '오늘': [], '이번 주': [], '그 전': [] };      // ⭐ 즐겨찾기는 때 묶음보다 위 (10-05)
   for (const d of 보일것) {
-    const k = d.when >= 오늘0.getTime() ? '오늘' : d.when >= 오늘0.getTime() - 6 * 864e5 ? '이번 주' : '그 전';
+    const k = d.즐겨 ? 즐겨이름 : d.when >= 오늘0.getTime() ? '오늘' : d.when >= 오늘0.getTime() - 6 * 864e5 ? '이번 주' : '그 전';
     묶음[k].push(d);
   }
   let h = 묶음권함();
   for (const [k, arr] of Object.entries(묶음)) {
     if (!arr.length) continue;
     const 다 = 고름 && arr.every(d => 고름.has(d.id));
-    h += `<div class="sec"><span>${k}</span>${고름 ? `<button class="모두칸${다 ? ' on' : ''}" data-sec="${k}">${다 ? '모두 ✓' : '모두'}</button>` : ''}</div><div class="묶음">`;   // DSM (10-04) — 때 묶음마다 카드 하나 + 가는 줄
+    h += `<div class="sec${k === 즐겨이름 ? ' 즐겨머리' : ''}"><span>${k}</span>${고름 ? `<button class="모두칸${다 ? ' on' : ''}" data-sec="${k}">${다 ? '모두 ✓' : '모두'}</button>` : ''}</div><div class="묶음${k === 즐겨이름 ? ' 즐겨칸' : ''}">`;   // DSM (10-04) — 때 묶음마다 카드 하나 + 가는 줄
     for (const d of arr) {
       const ext = (d.ext || '').toLowerCase(), 표 = 묶음들(d);
       h += `<div class="item" data-id="${글(d.id)}" role="button">
         ${고름 ? `<span class="고름칸${고름.has(d.id) ? ' on' : ''}" aria-hidden="true">✓</span>` : ''}
         <span class="badge b-${딱지(ext)}">${글((ext || '?').toUpperCase().slice(0, 4))}</span>
-        <div class="t"><div class="n">${글(d.name)}</div><div class="s">${글(d.from || '')} · ${때(d.when)}${d.size > 0 ? ' · ' + 크기(d.size) : ''}${표.length ? ' · 🏷 ' + 글(표.join(', ')) : ''}</div>${d.메모 ? `<div class="memo">📝 ${글(d.메모.split('\n')[0].slice(0, 60))}</div>` : ''}</div>
+        <div class="t"><div class="n">${글(d.name)}</div><div class="s">${글(d.from || '')} · ${때(d.when)}${자리글(d)}${d.size > 0 ? ' · ' + 크기(d.size) : ''}${표.length ? ' · 🏷 ' + 글(표.join(', ')) : ''}</div>${자리막대(d)}${d.메모 ? `<div class="memo">📝 ${글(d.메모.split('\n')[0].slice(0, 60))}</div>` : ''}</div>
         ${고름 ? '' : `<button class="more" data-more="${글(d.id)}" aria-label="더 보기"><svg class="ico"><use href="#i-more"/></svg></button>`}
       </div>`;
     }
@@ -154,7 +154,21 @@ function 목록그리기() {
   $('#list').innerHTML = h;
   고르기판갱신();
 }
-// 고르기 (10-04) — 한꺼번에 지우기 · 묶음에 넣기 · 뒤로 = 끝
+// 목록 줄의 «보던 자리» · 책갈피 수 · 막대 (10-05) — 끝까지 본 문서 · 맨 앞은 막대 없음
+const 즐겨이름 = '⭐ 즐겨찾기';
+function 자리글(d) {
+  const o = 자리읽기(d), 책 = String(d.책갈피 || ''), 책수 = 책 ? (책.startsWith('f') ? 1 : 책.split(',').length) : 0;
+  let s = '';
+  if (o?.n) s += ` · <span class="자리">${(o.c ?? o.p) + 1} / ${o.n}${['ppt', 'pptx'].includes(String(d.ext).toLowerCase()) ? '장' : '쪽'}</span>`;
+  else if (o?.f > 0.01) s += ` · <span class="자리">${Math.round(o.f * 100)}%</span>`;
+  if (책수) s += ` · 🔖${책수 > 1 ? ' ' + 책수 : ''}`;
+  return s;
+}
+function 자리막대(d) {
+  const o = 자리읽기(d), 비 = o?.n ? ((o.c ?? o.p) + 1) / o.n : o?.f;
+  return 비 > 0.005 && 비 < 0.98 ? `<div class="자리막대"><i style="width:${(비 * 100).toFixed(1)}%"></i></div>` : '';
+}
+// 고르기 (10-04) — 한꺼번에 지우기 · 묶음에 넣기 · 뒤로 = 끝 · ⭐ 즐겨찾기 (10-05)
 function 고르기시작(id) {
   if (고름) { if (id) 고름.add(id); return 목록그리기(); }
   고름 = new Set(id ? [id] : []);
@@ -174,7 +188,8 @@ function 고르기판갱신() {
   $('#selcnt').textContent = `${n}개 고름`;
   $('#selall').textContent = 보일것.length && 보일것.every(d => 고름.has(d.id)) ? '다 풀기' : '다 고르기';
   $('#seldel').textContent = n ? `${n}개 지우기` : '지우기';
-  $('#seldel').disabled = !n; $('#selgroup').disabled = !n;
+  $('#seldel').disabled = !n; $('#selgroup').disabled = !n; $('#selfav').disabled = !n;
+  $('#selfav').textContent = n && [...고름].every(id => 목록.find(d => d.id === id)?.즐겨) ? '⭐ 빼기' : '⭐ 즐겨찾기';
 }
 function 묶음붙이기(ids, 이름) {
   for (const id of ids) {
@@ -286,6 +301,12 @@ $('#selall').addEventListener('click', () => {
 });
 $('#seldel').addEventListener('click', () => 고름?.size && 지우기판());
 $('#selgroup').addEventListener('click', () => 고름?.size && 묶음넣기판());
+$('#selfav').addEventListener('click', () => {
+  if (!고름?.size) return;
+  const ids = [...고름], 뺌 = ids.every(id => 목록.find(d => d.id === id)?.즐겨);
+  for (const id of ids) 다리.setInfo(id, '즐겨', 뺌 ? '' : '1');
+  고르기끝(); 목록그리기(); 칩(뺌 ? `⭐ ${ids.length}개 뺌` : `⭐ ${ids.length}개 즐겨찾기 → 목록 맨 위`);
+});
 $('#pick').addEventListener('click', () => 다리.pickFile());
 
 function 판열기(html) { $('#sheet').onclick = null; $('#sheet').innerHTML = '<div class="grab"></div>' + html; $('#sheet').hidden = false; $('#dim').hidden = false; }
@@ -296,11 +317,13 @@ function 알림판(말) { 판열기(`<h3>${글(말)}</h3><button class="btn plai
 function 더보기판(id) {
   const d = 목록.find(x => x.id === id); if (!d) return;
   판열기(`<h3>${글(d.name)}</h3>
+    <button class="act" id="favt">${d.즐겨 ? '⭐ 즐겨찾기에서 빼기' : '⭐ 즐겨찾기에 넣기 (목록 맨 위)'}</button>
     <button class="act" id="memoedit">📝 쪽지 ${d.메모 ? '고치기' : '쓰기'}</button>
     <button class="act warn" id="rm">목록에서 빼기 (폰 안의 사본 · 쪽지 · 펜 표시도 지움)</button>
     <button class="act" onclick="판닫기()">닫기</button>`);
   $('#rm').onclick = () => { 다리.remove(id); 판닫기(); 목록그리기(); };
   $('#memoedit').onclick = () => 쪽지판(d);
+  $('#favt').onclick = () => { 다리.setInfo(id, '즐겨', d.즐겨 ? '' : '1'); 판닫기(); 목록그리기(); };
 }
 
 // ②-2 문서 쪽지 (v0.6) — 문서마다 글 메모 하나 · 원본은 안 고침 · 껍데기 recent.json 줄의 「메모」 칸
@@ -334,6 +357,7 @@ $('#memofold').addEventListener('click', () => 쪽지보이기(true));
 let 지금 = null;           // { id, ext, 쪽들, 쪽수 }
 // 덧 (10-04 · ZIP) : 깊이 — ZIP 에서 꺼내 연 문서는 1 (ZIP 속 ZIP 은 2 …) · 압축에서 — 뒤로 가면 돌아갈 ZIP { id, 폴더, 깊이 } · 폴더 — ZIP 을 다시 열 때 그 폴더로
 function 열기(id, 쌓기, 덧 = {}) {
+  자리적기();                                         // 보던 문서의 자리 (ZIP 에서 다른 문서로 · PPT 보는 방식 바꿈)
   고름 = null;                                       // 고르기 중에 새 파일을 받으면 고르기는 끝
   목록그리기();
   const d = 목록.find(x => x.id === id);
@@ -349,6 +373,7 @@ function 열기(id, 쌓기, 덧 = {}) {
   찾기닫기(); $('#flowin').innerHTML = ''; $('#flow').hidden = true; $('#reader').hidden = false;
   $('#cadbox').hidden = true; 도면판?.끝(); 도면판 = null; $('#zipbox').hidden = true;
   표시마저쓰기(); 펜끄기(); 재기끄기(); 쪽목록닫기(); 되돌릴것 = [];
+  $('#bmk').hidden = true; $('#resume').hidden = true;
   $('#cadbox').style.background = '';
   확대 = 1; $('#pages').style.width = '100%'; 미끄럼멈춤();
   지금 = { id, ext: (d.ext || '').toLowerCase(), d, 돌림: (Number(d.돌림) || 0) & 3, 표시: 표시읽기(id), 깊이: 덧.깊이 || 0, 압축에서: 덧.압축에서 };
@@ -488,6 +513,7 @@ async function 글문서열기(d) {
     if (!안.textContent.trim() && !안.querySelector('img')) 알림('<b>글자가 없는 문서</b><div class="sm">그림만 든 문서일 수 있음</div>');
     도구보이기(['txt', 'xlsx', 'xls', 'ppt'].includes(지금.ext) ? ['find', 'size'] : 지금.ext === 'pptx' ? ['find', 'size', 'pptmode'] : ['find', 'size', 'plain']);
     if (지금.ext === 'pptx') 피피티모드글();
+    자리되살리기(); 책갈피단추();
   } catch (e) {                                         // 모양을 못 그리면 글자만이라도
     let 글자 = '';
     try { 글자 = await 문서.글자만뽑기(지금.ext, buf); } catch (e2) {}
@@ -498,6 +524,7 @@ async function 글문서열기(d) {
       지금.글자만 = true;
       알림(`<b>모양은 못 그림 → 글자만 보여 줌</b><div class="sm">${글(e.message)}</div>`);
       도구보이기(['find', 'size']);
+      자리되살리기(); 책갈피단추();
     } else {
       알림(`<b>열 수 없음 · 파일이 깨졌을 수 있음</b><div class="sm">${글(e.message)}</div>`);
     }
@@ -664,6 +691,7 @@ async function pdf열기(d) {
   }, { root: $('#reader'), rootMargin: '1500px 0px' });
   틀.querySelectorAll('.pg').forEach(p => 지켜보기.observe(p));
   $('#reader').scrollTop = 0;
+  자리되살리기(); 책갈피단추();
 }
 // 그릴 너비 — 옆으로 돌렸으면 쪽 틀의 «높이» 가 원래 쪽의 너비
 function 쪽너비(p) {
@@ -694,6 +722,7 @@ $('#reader').addEventListener('scroll', () => {
   let n = 1;
   for (const p of $('#pages').children) { if (p.offsetTop <= 가운데) n = Number(p.dataset.n) + 1; else break; }
   칩(`${n} / ${지금.쪽수}${단위()}`);
+  if (!$('#bmk').hidden) $('#bmk').classList.toggle('on', 책갈피쪽들().includes(n - 1));
 }, { passive: true });
 
 // ④-2 돌리기 (v0.6) — 그림 · PDF 는 쪽 틀(.pg)의 비율을 뒤집고 안쪽 틀(.속 = 그림 + 펜 표시)을 가운데에서 돌림 · 도면은 dxf.js
@@ -753,7 +782,7 @@ function 표시저장() {
   표시시계 = setTimeout(표시쓰기, 400);
 }
 function 표시마저쓰기() { clearTimeout(표시시계); 표시쓰기?.(); }
-document.addEventListener('visibilitychange', () => { if (document.hidden) 표시마저쓰기(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { 표시마저쓰기(); 자리적기(); } });
 function 표시바꿈(열쇠, 일) {
   const 쪽 = 지금.표시.쪽, arr = (쪽[열쇠] ||= []);
   if (일.더함) arr.push(일.더함);
@@ -902,15 +931,16 @@ function 쪽으로(n) {
 }
 function 쪽목록열기() {
   if (!지금?.쪽수) return;
-  const N = 지금.쪽수, 지금쪽 = 보는쪽(), 그리드 = $('#tgrid');
+  const N = 지금.쪽수, 지금쪽 = 보는쪽(), 그리드 = $('#tgrid'), 책 = new Set(책갈피쪽들());
   history.pushState({ v: 'thumbs' }, '');
   $('#thumbs').hidden = false;
   $('#tsub').textContent = `${N}${단위()} · 지금 ${지금쪽 + 1}${단위()}`;
   $('#tn').max = N; $('#tn').value = '';
   그리드.innerHTML = [...$('#pages').children].map(pg => {
     const n = Number(pg.dataset.n);
-    return `<button class="썸${n === 지금쪽 ? ' 지금' : ''}" data-n="${n}"><div class="썸틀" data-pw="${pg.dataset.pw}" data-ph="${pg.dataset.ph}"><div class="속"></div></div><span class="썸번호">${n + 1}${지금.표시.쪽[n] ? ' <i>✏</i>' : ''}${(지금.표시.메모 || []).some(m => m.k === String(n)) ? ' 📝' : ''}</span></button>`;
+    return `<button class="썸${n === 지금쪽 ? ' 지금' : ''}" data-n="${n}"><div class="썸틀" data-pw="${pg.dataset.pw}" data-ph="${pg.dataset.ph}"><div class="속"></div></div><span class="썸번호">${n + 1}${지금.표시.쪽[n] ? ' <i>✏</i>' : ''}${(지금.표시.메모 || []).some(m => m.k === String(n)) ? ' 📝' : ''}${책.has(n) ? ' <b class="책">🔖</b>' : ''}</span></button>`;
   }).join('');
+  쪽목록책만 = false; 쪽목록칩();
   그리드.querySelectorAll('.썸틀').forEach(쪽모양);
   쪽목록지켜봄?.disconnect();
   쪽목록지켜봄 = new IntersectionObserver(es => {
@@ -926,6 +956,15 @@ function 쪽목록열기() {
   그리드.querySelectorAll('.썸틀').forEach(t => 쪽목록지켜봄.observe(t));
   그리드.querySelector('.지금')?.scrollIntoView({ block: 'center' });
 }
+// 쪽 목록 위 칩 「모든 쪽 · 🔖 3」 (10-05) — 책갈피가 있을 때만
+let 쪽목록책만 = false;
+function 쪽목록칩() {
+  const 책 = new Set(책갈피쪽들()), k = $('#tkinds');
+  k.hidden = !책.size; if (!책.size) 쪽목록책만 = false;
+  k.innerHTML = `<button class="칩${쪽목록책만 ? '' : ' on'}" data-t="모두">모든 ${단위()} <i>${지금.쪽수}</i></button><button class="칩${쪽목록책만 ? ' on' : ''}" data-t="책">🔖 <i>${책.size}</i></button>`;
+  $('#tgrid').querySelectorAll('.썸').forEach(b => (b.style.display = 쪽목록책만 && !책.has(Number(b.dataset.n)) ? 'none' : ''));
+}
+$('#tkinds').addEventListener('click', e => { const c = e.target.closest('[data-t]'); if (!c) return; 쪽목록책만 = c.dataset.t === '책'; 쪽목록칩(); $('#tgrid').scrollTop = 0; });
 function 쪽목록닫기() {
   if ($('#thumbs').hidden) return;
   $('#thumbs').hidden = true; 쪽목록지켜봄?.disconnect();
@@ -938,6 +977,87 @@ $('#tclose').addEventListener('click', () => history.state?.v === 'thumbs' ? his
 const 번호로 = () => { const n = parseInt($('#tn').value, 10); if (n >= 1) 쪽목록에서(Math.min(지금.쪽수, n) - 1); };
 $('#tgo').addEventListener('click', 번호로);
 $('#tn').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); 번호로(); } });
+
+// ④-4b 직전 자리 (10-05 · 0.9.3 · 목업 1_읽을거리\여덟가지_목업.html 승인 「바로 그 자리 + 알림」)
+//   다시 열면 보던 쪽 · 확대 · 글 문서 스크롤 · 엑셀 시트 그대로 · recent 줄 「자리」 칸 (JSON 글)
+//   쪽 문서 { p: 맨 위 쪽(0부터), r: 그 쪽 안 비율, c: 가운데 쪽(목록에 보임), n: 쪽수, z: 확대, x: 옆 비율 } · 글 문서 { f: 스크롤 비율, s: 시트 }
+//   맨 앞이면 칸을 지움 · 다 그리기 전에 닫으면 안 적음 (지금.자리됨) · 그림 · 도면은 안 함
+function 자리읽기(d) { try { return JSON.parse(d?.자리 || 'null'); } catch (e) { return null; } }
+function 자리적기() {
+  if (!지금?.자리됨) return;
+  const r = $('#reader'), f = $('#flow');
+  let o = null;
+  if (지금.쪽수 && !r.hidden) {
+    let 쪽 = null;
+    for (const pg of $('#pages').children) if (pg.offsetTop + pg.offsetHeight > r.scrollTop) { 쪽 = pg; break; }
+    if (!쪽 || !쪽.offsetHeight) return;
+    const p = Number(쪽.dataset.n), 비 = Math.max(0, (r.scrollTop - 쪽.offsetTop) / 쪽.offsetHeight), 옆 = r.scrollWidth - r.clientWidth;
+    if (p > 0 || 비 > 0.02 || 확대 > 1.01) o = { p, r: +비.toFixed(4), c: 보는쪽(), n: 지금.쪽수, ...(확대 > 1.01 ? { z: +확대.toFixed(3), x: 옆 > 0 ? +(r.scrollLeft / 옆).toFixed(4) : 0 } : {}) };
+  } else if (!f.hidden) {
+    const 끝 = f.scrollHeight - f.clientHeight, 비 = 끝 > 0 ? f.scrollTop / 끝 : 0;
+    const 시트 = [...$('#flowin').querySelectorAll('.시트탭 button')].findIndex(b => b.classList.contains('on'));
+    if (비 > 0.01 || 시트 > 0) o = { f: +비.toFixed(4), ...(시트 > 0 ? { s: 시트 } : {}) };
+  } else return;
+  const 새 = o ? JSON.stringify(o) : '';
+  if (새 === (지금.d.자리 || '')) return;
+  지금.d.자리 = 새 || undefined;
+  다리.setInfo(지금.id, '자리', 새);
+}
+function 자리되살리기() {
+  if (!지금) return;
+  지금.자리됨 = true;
+  const o = 자리읽기(지금.d); if (!o) return;
+  if (지금.쪽수 && o.p != null && !$('#reader').hidden) {
+    const pg = $('#pages').children[Math.min(지금.쪽수 - 1, o.p)], r = $('#reader'); if (!pg) return;
+    if (o.z > 1.01) { 확대 = Math.min(4, o.z); $('#pages').style.width = (100 * 확대) + '%'; 손모드(); }
+    r.scrollTop = pg.offsetTop + (o.r || 0) * pg.offsetHeight;
+    if (o.x) r.scrollLeft = o.x * (r.scrollWidth - r.clientWidth);
+    이어봄알림(`보던 ${Math.min(지금.쪽수, (o.c ?? o.p) + 1)}${단위()}에서 이어 봄${o.z > 1.01 ? ` · ${Math.round(o.z * 100)}%` : ''}`);
+  } else if (o.f != null && !$('#flow').hidden) {
+    if (o.s) $('#flowin').querySelectorAll('.시트탭 button')[o.s]?.click();
+    const f = $('#flow'); f.scrollTop = o.f * (f.scrollHeight - f.clientHeight);
+    이어봄알림(o.s && o.f <= 0.01 ? '보던 시트로 엶' : `보던 자리(${Math.round(o.f * 100)}%)에서 이어 봄`);
+  }
+}
+let 이어봄시계 = 0;
+function 이어봄알림(말) {
+  $('#resumetext').textContent = 말; $('#resume').hidden = false;
+  clearTimeout(이어봄시계); 이어봄시계 = setTimeout(() => ($('#resume').hidden = true), 4500);
+}
+$('#resumetop').addEventListener('click', () => {
+  $('#resume').hidden = true; if (!지금) return;
+  if (지금.쪽수 && !$('#reader').hidden) {
+    const r = $('#reader'); 미끄럼멈춤(); 확대 = 1; $('#pages').style.width = '100%'; 손모드(); r.scrollTop = 0; r.scrollLeft = 0; 선명하게();
+  } else { $('#flowin').querySelector('.시트탭 button')?.click(); $('#flow').scrollTop = 0; }
+});
+
+// ④-4c 책갈피 (10-05 · 머리 📝 옆 🔖) — 쪽 문서는 쪽마다 여럿 (「책갈피」 칸 = 쪽 번호 0부터 쉼표로) · 글 문서는 자리 하나 (「f0.4123」)
+const 책갈피쪽들 = () => { const s = String(지금?.d?.책갈피 || ''); return s && !s.startsWith('f') ? s.split(',').map(Number).filter(n => n >= 0) : []; };
+function 책갈피쓰기(v) { 지금.d.책갈피 = v || undefined; 다리.setInfo(지금.id, '책갈피', v || ''); 책갈피단추(); }
+function 책갈피단추() {
+  const b = $('#bmk'); if (!지금) { b.hidden = true; return; }
+  const 쪽 = 지금.쪽수 > 1 && !$('#reader').hidden, 흐름 = !$('#flow').hidden && !!지금.자리됨;
+  b.hidden = !(쪽 || 흐름);
+  b.classList.toggle('on', 쪽 ? 책갈피쪽들().includes(보는쪽()) : String(지금.d.책갈피 || '').startsWith('f'));
+}
+$('#bmk').addEventListener('click', () => {
+  if (!지금) return;
+  if (지금.쪽수 && !$('#reader').hidden) {
+    const n = 보는쪽(), 들 = 책갈피쪽들(), 있음 = 들.includes(n);
+    책갈피쓰기((있음 ? 들.filter(x => x !== n) : [...들, n].sort((a, b) => a - b)).join(','));
+    return 칩(있음 ? `${n + 1}${단위()} 책갈피 뺌` : `🔖 ${n + 1}${단위()}에 꽂음 → 쪽 목록에서 모아 봄`);
+  }
+  const f = $('#flow'), 끝 = f.scrollHeight - f.clientHeight, 지금비 = 끝 > 0 ? f.scrollTop / 끝 : 0, 옛 = String(지금.d.책갈피 || '');
+  if (!옛.startsWith('f')) { 책갈피쓰기('f' + 지금비.toFixed(4)); return 칩('🔖 이 자리에 꽂음 → 다시 누르면 가기'); }
+  const 비 = Number(옛.slice(1)) || 0;
+  판열기(`<h3>🔖 책갈피 · ${Math.round(비 * 100)}%</h3>
+    <button class="act" id="bmgo">책갈피 자리로 가기</button>
+    <button class="act" id="bmmove">지금 자리(${Math.round(지금비 * 100)}%)로 옮기기</button>
+    <button class="act warn" id="bmdel">책갈피 빼기</button>`);
+  $('#bmgo').onclick = () => { 판닫기(); f.scrollTop = 비 * (f.scrollHeight - f.clientHeight); };
+  $('#bmmove').onclick = () => { 판닫기(); 책갈피쓰기('f' + 지금비.toFixed(4)); 칩('🔖 지금 자리로 옮김'); };
+  $('#bmdel').onclick = () => { 판닫기(); 책갈피쓰기(''); 칩('책갈피 뺌'); };
+});
 
 // ④-5 치수 재기 (v0.7 · 도면) — 톡 찍을 때마다 점 · 가까운 끝점에 붙음 · 끌면 밀기 · 저장 안 함
 function 재기글(o) {
@@ -1209,6 +1329,7 @@ function 손뗌(e) {
 
 // ⑥ 뒤로 · 시작 ───────────────────────────────────
 function 목록으로() {
+  자리적기(); $('#resume').hidden = true;
   찾기닫기(); 표시마저쓰기(); 펜끄기(); 재기끄기(); 쪽목록닫기(); $('#memobox').hidden = true;
   $('#viewer').hidden = true; $('#home').hidden = false; 판닫기(); $('#zipbox').hidden = true; $('#zipbox').innerHTML = ''; 압축보기.비우기();
   if (지켜보기) 지켜보기.disconnect();

@@ -364,3 +364,20 @@ i.형광점 { border-radius:7px !important; }
 .권함단추 .칩.on { color:var(--accent-ink); font-weight:700; }
 .빈칸글 { text-align:center; color:var(--sub); font-size:14px; padding:30px 0; }
 .흐림 { color:var(--sub); font-weight:400; }
+
+/* ── 0.9.3 (10-05 · 목업 1_읽을거리\여덟가지_목업.html 승인) — ② 직전 자리 · ⑭ 즐겨찾기 · 책갈피 ── */
+.item .s .자리 { color:var(--accent-ink); font-weight:700; }
+.자리막대 { height:3px; border-radius:2px; background:var(--line); margin-top:5px; overflow:hidden; }
+.자리막대 i { display:block; height:100%; background:var(--accent); border-radius:2px; }
+.sec.즐겨머리 span { color:var(--accent-ink); }
+.묶음.즐겨칸 { box-shadow:0 0 0 2px var(--accent-soft), var(--shadow); }
+.selfoot button { padding:14px 6px; white-space:nowrap; }
+.chip { z-index:6; }
+.bmk-b { color:var(--sub); }
+.bmk-b.on { color:var(--accent); }
+.bmk-b.on .ico { fill:var(--accent); }
+.이어봄 { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(124px + env(safe-area-inset-bottom)); display:flex; align-items:center; gap:10px; background:rgba(20,22,26,.86); color:#fff; font-size:13px; padding:6px 6px 6px 14px; border-radius:999px; white-space:nowrap; z-index:6; }
+.이어봄 button { color:#ffd27a; font-weight:700; font-size:13px; padding:5px 10px; border-radius:999px; }
+.이어봄 button:active { background:rgba(255,255,255,.12); }
+.thumbs #tkinds { padding-top:2px; }
+.썸번호 .책 { color:var(--accent); }
