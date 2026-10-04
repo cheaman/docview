@@ -44,6 +44,7 @@ button{font:inherit;cursor:pointer}
 textarea,input[type=text]{width:100%;border:0;border-radius:12px;background:var(--chip);color:var(--ink);padding:10px 12px;font:inherit;font-size:14px;resize:vertical}
 /* 1 가져오기 */
 .놓는곳{border:2px dashed var(--line);border-radius:var(--r);padding:26px 12px;text-align:center;color:var(--dim);font-size:14px}
+.놓는곳 small{font-size:13px;line-height:1.6}
 .놓는곳.위{border-color:var(--c);color:var(--c)}
 /* 2 자르기 */
 video{width:100%;max-height:46vh;background:#000;border-radius:12px}
