@@ -27,3 +27,36 @@ function 곧게(점) {
   if (Math.abs(x1 - x0) / L < 끝) { const xm = (x0 + x1) / 2; return [xm, y0, xm, y1]; }
   return [x0, y0, x1, y1];
 }
+
+// 도형 (0.9.4 · 목업 여덟가지_목업.html ⑬) — 두 점으로 반듯한 화살표(a) · 네모(r) · 동그라미(o) 를 «점 목록» 으로
+//   그리기 · 지우개 · 되돌리기 · 사본은 펜 획과 똑같이 다룸 (획에 f = 꼴 · a = 두 점을 같이 적어 두어 나중에 옮기기 · 크기 바꾸기)
+//   좌표는 가로 · 세로 길이가 같은 단위 (쪽은 쪽 너비 · 높이를 곱한 값 · 도면은 도면 좌표) · 굵 = 선 굵기 같은 단위
+function 도형점(f, x0, y0, x1, y1, 굵) {
+  if (f === 'r') return [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0];
+  if (f === 'o') {
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = Math.abs(x1 - x0) / 2, ry = Math.abs(y1 - y0) / 2, a = [];
+    for (let k = 0; k <= 48; k++) { const t = k / 48 * 2 * Math.PI; a.push(cx + rx * Math.cos(t), cy + ry * Math.sin(t)); }
+    return a;
+  }
+  // 화살표 — 꼬리 → 끝 → 한쪽 날개 → 끝 → 다른 날개 (머리 = 굵기의 7배 · 길이의 40% 까지 · 날개 26°)
+  const L = Math.hypot(x1 - x0, y1 - y0) || 1, h = Math.min(L * 0.4, 굵 * 7), ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+  const c = Math.cos(Math.PI / 7), s = Math.sin(Math.PI / 7);
+  return [x0, y0, x1, y1, x1 - h * (ux * c - uy * s), y1 - h * (uy * c + ux * s), x1, y1, x1 - h * (ux * c + uy * s), y1 - h * (uy * c - ux * s)];
+}
+// 점 (x, y) 에서 획 선(토막)까지 가장 가까운 거리 — 같은 길이 단위 [x0, y0, x1, y1, …]
+function 선거리(p, x, y) {
+  if (p.length === 2) return Math.hypot(p[0] - x, p[1] - y);
+  let 최 = Infinity;
+  for (let k = 2; k < p.length; k += 2) {
+    const ax = p[k - 2], ay = p[k - 1], dx = p[k] - ax, dy = p[k + 1] - ay, L = dx * dx + dy * dy;
+    const t = L ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L)) : 0;
+    최 = Math.min(최, Math.hypot(ax + t * dx - x, ay + t * dy - y));
+  }
+  return 최;
+}
+// 글 획(t)의 상자 [x0, y0, x1, y1] — 좌표는 «아래로 갈수록 커지는» 꼴 (도면은 y 를 뒤집어 넣음) · r = 쓸 때의 돌림 (그 방향에서 늘 똑바로)
+//   글 너비는 글자 수로 어림 (한글 1 · 영문 · 숫자 0.6 글자 크기)
+function 글상자(X, Y, fs, 글, r) {
+  const tw = Math.max(1, [...String(글)].reduce((s, ch) => s + (ch.charCodeAt(0) > 255 ? 1 : 0.6), 0)) * fs, th = fs * 1.25;
+  return r === 1 ? [X, Y - tw, X + th, Y] : r === 2 ? [X - tw, Y - th, X, Y] : r === 3 ? [X - th, Y, X, Y + tw] : [X, Y, X + tw, Y + th];
+}

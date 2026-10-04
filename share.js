@@ -22,6 +22,12 @@ const 보내기 = {};
   x.drawImage(im, 0, 0, w, h);
   const 긋기 = (g, 획) => {
     const p = 획.p; if (!p.length) return;
+    if (획.t != null) {                              // 글 (0.9.4) — 쓸 때의 방향으로 · 흰 테두리
+      const fs = 획.w * w; g.save(); g.translate(p[0] * w, p[1] * h); g.rotate(-(획.r || 0) * Math.PI / 2);
+      g.font = `700 ${fs}px Pretendard, system-ui, sans-serif`; g.textBaseline = 'top'; g.lineJoin = 'round';
+      g.lineWidth = fs * 0.14; g.strokeStyle = '#ffffff'; g.strokeText(획.t, 0, 0); g.fillStyle = 색값(획.c); g.fillText(획.t, 0, 0);
+      return g.restore();
+    }
     g.strokeStyle = 색값(획.c); g.lineWidth = Math.max(1, 획.w * w); g.lineCap = 'round'; g.lineJoin = 'round';
     g.beginPath(); g.moveTo(p[0] * w, p[1] * h);
     if (p.length === 2) g.lineTo(p[0] * w + 0.01, p[1] * h);

@@ -204,7 +204,8 @@ mark.cur { background:#ff9f2e; }
 .penbar { flex:none; display:flex; align-items:center; gap:4px; padding:6px 8px; background:var(--bar); border-top:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
 .penbar::-webkit-scrollbar { display:none; }
 .chip { white-space:nowrap; }
-#viewer:has(#penbar:not([hidden])) .chip { bottom:calc(140px + env(safe-area-inset-bottom)); }
+body:has(#viewer:not([hidden]) #penbar:not([hidden])) .chip { bottom:calc(140px + env(safe-area-inset-bottom)); }   /* 칩이 body 로 나감 (0.9.3) */
+body:has(#viewer:not([hidden]) #shapebar:not([hidden])) .chip { bottom:calc(206px + env(safe-area-inset-bottom)); }
 .penbar .펜색 { width:38px; height:38px; border-radius:50%; display:grid; place-items:center; flex:none; }
 .penbar .펜색 i { width:24px; height:24px; border-radius:50%; display:block; box-shadow:inset 0 0 0 2px rgba(0,0,0,.12); }
 .penbar .펜색.on { background:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent); }
@@ -381,3 +382,10 @@ i.형광점 { border-radius:7px !important; }
 .이어봄 button:active { background:rgba(255,255,255,.12); }
 .thumbs #tkinds { padding-top:2px; }
 .썸번호 .책 { color:var(--accent); }
+
+/* ── 0.9.4 ⑬ 펜 도형 — 펜 판 「도형」 → 위에 작은 줄 (화살표 · 네모 · 동그라미 · 글) ── */
+.shapebar { flex:none; display:flex; gap:6px; justify-content:center; padding:8px 8px 4px; background:var(--bar); border-top:1px solid var(--line); }
+.shapebar button { display:flex; flex-direction:column; align-items:center; gap:2px; min-width:62px; padding:6px 4px; border-radius:12px; font-size:13px; color:var(--bar-text); }
+.shapebar button .ico { width:22px; height:22px; }
+.shapebar button.on { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; box-shadow:inset 0 0 0 2px var(--accent); }
+.pages { margin:0 auto; }   /* 1배 아래로 줄이면 가운데 (10-05) */

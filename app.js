@@ -442,7 +442,7 @@ async function 도면열기(d) {
       목록, 레이어: 모음.레이어, 돌림: 지금.돌림,
       표시: () => 지금?.표시.쪽.d || [], 표시바뀜: 일 => 표시바꿈('d', 일), 돌림요청: 돌리기,
       재기바뀜: 재기글,
-      메모톡: (x, y) => 새메모('d', x, y), 그린뒤: () => 도면메모배치(),
+      메모톡: (x, y) => 새메모('d', x, y), 그린뒤: () => 도면메모배치(), 글톡: 도면글톡,
     });
     도면메모그리기();
     지금.단위 = { 1: 'in', 2: 'ft', 4: 'mm', 5: 'cm', 6: 'm' }[parseInt(모음.머리?.$INSUNITS?.[70], 10)] || '';
@@ -796,6 +796,7 @@ function 되돌리기() {
   const 쪽 = 지금.표시.쪽, arr = (쪽[일.열쇠] ||= []);
   if (일.더함) { const i = arr.lastIndexOf(일.더함); if (i >= 0) arr.splice(i, 1); }
   else if (일.뺌) arr.splice(Math.min(일.자리, arr.length), 0, 일.뺌);
+  else if (일.고침) Object.assign(일.고침, 일.옛);          // 도형 옮김 · 크기 · 글 고침 · 색 (0.9.4)
   if (!arr.length) delete 쪽[일.열쇠];
   표시저장(); 표시다시(일.열쇠); 펜판갱신();
 }
@@ -816,8 +817,8 @@ function 획모양(획, W) {
 function 쪽표시그리기(p) {
   const svg = p.querySelector('svg.mk'), hl = p.querySelector('svg.hl'); if (!svg || !지금) return;
   const W = +p.dataset.pw, H = +p.dataset.ph, 획들 = 지금.표시.쪽[p.dataset.n] || [];
-  const 그림 = 획 => `<path d="${획경로(획, W, H)}" ${획모양(획, W)}/>`;
-  svg.innerHTML = 획들.filter(획 => !형광인가(획.c)).map(그림).join('');
+  const 그림 = 획 => (획.t != null ? 글그림(획, W, H) : `<path d="${획경로(획, W, H)}" ${획모양(획, W)}/>`);
+  svg.innerHTML = 획들.filter(획 => !형광인가(획.c)).map(그림).join('') + 손잡이그림(p, 획들, W, H);
   if (hl) hl.innerHTML = 획들.filter(획 => 형광인가(획.c)).map(그림).join('');
 }
 // 화면 점 → 그 쪽의 원래(안 돌린) 0~1 좌표 · 원래 쪽 너비가 화면에서 몇 화소인지
@@ -831,6 +832,7 @@ function 긋기시작(x, y) {
   const p = document.elementFromPoint(x, y)?.closest('#pages .pg');
   if (!p || !p.querySelector('svg.mk')) { 긋기 = { 없음: true }; return; }
   if (펜.지우개) { 긋기 = { 지우개: true }; 쪽지우기(x, y); return; }
+  if (펜.도형) return 도형시작(p, x, y);
   const q = 쪽좌표(p, x, y);
   const 획 = { c: 펜.색, w: +(획굵기(펜.색) / q.화소).toPrecision(4), p: [네자리(q.x), 네자리(q.y)] };
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -846,34 +848,152 @@ function 긋기그림() {
 function 긋기이음(x, y) {
   if (!긋기 || 긋기.없음) return;
   if (긋기.지우개) return 쪽지우기(x, y);
+  if (긋기.도형새 || 긋기.고침 || 긋기.글새) return 도형이음(x, y);
   const q = 쪽좌표(긋기.p, x, y), a = 긋기.획.p, n = a.length;
   if (Math.hypot(q.x - a[n - 2], q.y - a[n - 1]) * 긋기.화소 < 1.5) return;
   a.push(네자리(q.x), 네자리(q.y)); 긋기.화면.push(x, y); 긋기그림();
 }
 function 긋기끝(버림) {
   const g = 긋기; 긋기 = null;
+  if (g?.고침 || g?.글새) return 도형끝(g, 버림);
   if (!g?.획) return;
   if (버림) { g.path.remove(); return; }
+  if (g.도형새) {                                     // 도형 — 12 화소보다 짧으면 버림 · 그린 것은 골라 둠 (끝 동그라미)
+    g.path.remove();
+    if (!g.끝화면 || Math.hypot(g.끝화면[0] - g.화면[0], g.끝화면[1] - g.화면[1]) < 12) return g.후보 ? 선택바꿈(g.후보, g.p.dataset.n) : undefined;   // 톡 — 도형 선 위면 그 도형을 고름
+    선택바꿈(g.획, g.p.dataset.n); return 표시바꿈(g.p.dataset.n, { 더함: g.획 });
+  }
   const 곧은 = 형광인가(g.획.c) && 곧게(g.화면);              // 형광을 거의 곧게 그었으면 반듯한 줄로 (화면 기준 가로 · 세로)
   if (곧은) { const a = 쪽좌표(g.p, 곧은[0], 곧은[1]), b = 쪽좌표(g.p, 곧은[2], 곧은[3]); g.획.p = [a.x, a.y, b.x, b.y].map(네자리); }
   g.path.remove(); 표시바꿈(g.p.dataset.n, { 더함: g.획 });
 }
-function 쪽지우기(x, y) {                                  // 손가락 둘레 14 화소 안에 닿은 획을 통째로 뺌
+function 쪽지우기(x, y) {                                  // 손가락 둘레 14 화소 안에 닿은 획을 통째로 뺌 (0.9.4 — 선 토막까지 · 글은 글 상자)
   const p = document.elementFromPoint(x, y)?.closest('#pages .pg'); if (!p) return;
-  const q = 쪽좌표(p, x, y), H비 = p.dataset.ph / p.dataset.pw;
-  for (const 획 of [...(지금.표시.쪽[p.dataset.n] || [])]) {
-    const 둘레 = (14 / q.화소) + 획.w / 2, a = 획.p;
-    for (let k = 0; k < a.length; k += 2) {
-      if (Math.abs(a[k] - q.x) < 둘레 && Math.abs(a[k + 1] - q.y) * H비 < 둘레) { 표시바꿈(p.dataset.n, { 뺌: 획 }); break; }
-    }
+  const q = 쪽좌표(p, x, y), W = +p.dataset.pw, H = +p.dataset.ph;
+  for (const 획 of [...(지금.표시.쪽[p.dataset.n] || [])]) if (획닿음(획, q.x * W, q.y * H, W, H, 14 * W / q.화소)) 표시바꿈(p.dataset.n, { 뺌: 획 });
+}
+function 획닿음(획, X, Y, W, H, 둘레) {                  // X · Y · 둘레는 쪽 단위 (0~1 에 쪽 너비 · 높이를 곱한 값)
+  if (획.t != null) { const [x0, y0, x1, y1] = 글상자(획.p[0] * W, 획.p[1] * H, 획.w * W, 획.t, 획.r || 0); return X > x0 - 둘레 && X < x1 + 둘레 && Y > y0 - 둘레 && Y < y1 + 둘레; }
+  const s = []; for (let k = 0; k < 획.p.length; k += 2) s.push(획.p[k] * W, 획.p[k + 1] * H);
+  return 선거리(s, X, Y) < 둘레 + 획.w * W / 2;
+}
+
+// ④-3b 도형 (0.9.4 · 목업 1_읽을거리\여덟가지_목업.html ⑬) — 펜 판 「도형」 → 화살표 · 네모 · 동그라미 · 글 · 색은 펜 색
+//   도형 획 = 펜 획 + f(꼴) · a(두 점 0~1) — 점 목록(p)은 pen.js 도형점 이 만듦 → 그리기 · 지우개 · 사본은 펜과 같음
+//   그린 도형은 톡 → 끝 동그라미(손잡이) · 동그라미를 끌면 크기 · 선을 끌면 옮김 · 글은 끌면 옮김 · 「글」 로 톡하면 고치기
+//   글 획 = { c, w: 글자 크기(쪽 너비 비율), p: [왼쪽 위 x, y], t: 글, r: 쓸 때의 돌림 } — 그 방향에서 늘 똑바로
+let 도형선택 = null, 선택쪽 = null, 마지막도형 = 'a';
+function 선택바꿈(획, 쪽) {
+  const 옛 = 선택쪽; 도형선택 = 획 || null; 선택쪽 = 획 ? 쪽 : null;
+  if (옛 != null && 옛 !== 선택쪽) 표시다시(옛);
+  if (선택쪽 != null) 표시다시(선택쪽);
+}
+function 손잡이그림(pg, 획들, W, H) {
+  if (!펜.켬 || !펜.도형 || !도형선택?.a || !획들.includes(도형선택)) return '';
+  const b = pg.getBoundingClientRect(), 화 = (지금.돌림 & 1 ? b.height : b.width) || 1, r = 9 * W / 화, a = 도형선택.a;
+  return [0, 1].map(e => `<circle cx="${수(a[2 * e] * W)}" cy="${수(a[2 * e + 1] * H)}" r="${수(r)}" fill="#fff" stroke="#e8743b" stroke-width="${수(r * 0.3)}"/>`).join('');
+}
+function 글그림(획, W, H) {
+  const X = 수(획.p[0] * W), Y = 수(획.p[1] * H), fs = 획.w * W;
+  return `<text x="${X}" y="${Y}" font-size="${수(fs)}" font-weight="700" font-family="Pretendard, system-ui, sans-serif" dominant-baseline="hanging" fill="${색값(획.c)}" stroke="#fff" stroke-width="${수(fs * 0.14)}" stroke-linejoin="round" paint-order="stroke" transform="rotate(${-(획.r || 0) * 90} ${X} ${Y})">${글(획.t)}</text>`;
+}
+function 도형다시(획, W, H) { const a = 획.a; 획.p = 도형점(획.f, a[0] * W, a[1] * H, a[2] * W, a[3] * H, 획.w * W).map((v, k) => 네자리(k & 1 ? v / H : v / W)); }
+function 도형잡기(pg, x, y) {
+  // 고른 도형 : 끝 동그라미 → 그 끝 (크기) · 선 → 통째로 (옮김) / 「글」 : 쓴 글 → 옮김 · 톡하면 고치기
+  // 안 고른 도형 선 → 후보 (톡이면 고르기만 · 끌면 새 도형 — 옆에서 그리다 남의 도형을 끄는 실수 막기)
+  const q = 쪽좌표(pg, x, y), W = +pg.dataset.pw, H = +pg.dataset.ph, 단 = W / q.화소, X = q.x * W, Y = q.y * H, 획들 = 지금.표시.쪽[pg.dataset.n] || [];
+  if (도형선택?.a && 획들.includes(도형선택)) {
+    const a = 도형선택.a; for (const e of [0, 1]) if (Math.hypot(a[2 * e] * W - X, a[2 * e + 1] * H - Y) < 24 * 단) return { 획: 도형선택, 끝: e };
+    if (획닿음(도형선택, X, Y, W, H, 12 * 단)) return { 획: 도형선택, 끝: null };
   }
+  for (let i = 획들.length - 1; i >= 0; i--) {
+    const 획 = 획들[i];
+    if (펜.도형 === 't' ? 획.t != null : !!획.a) if (획닿음(획, X, Y, W, H, 12 * 단)) return 펜.도형 === 't' ? { 획, 끝: null } : { 후보: 획 };
+  }
+  return null;
+}
+function 도형시작(p, x, y) {
+  const q = 쪽좌표(p, x, y), 잡음 = 도형잡기(p, x, y);
+  if (잡음?.획) {
+    const 획 = 잡음.획;
+    if (획.a) 선택바꿈(획, p.dataset.n);
+    긋기 = { 고침: 획, 끝: 잡음.끝, p, q0: q, 옛: { p: [...획.p], ...(획.a ? { a: [...획.a] } : {}) }, 화면: [x, y], 움직임: false };
+    return;
+  }
+  선택바꿈(null);
+  if (펜.도형 === 't') { 긋기 = { 글새: true, p, q0: q, 화면: [x, y], 움직임: false }; return; }
+  const 점 = [네자리(q.x), 네자리(q.y)];
+  const 획 = { c: 펜.색, w: +(획굵기(펜.색) / q.화소).toPrecision(4), f: 펜.도형, a: [...점, ...점], p: [...점] };
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.querySelector('svg.mk').append(path);
+  긋기 = { 도형새: true, p, 획, path, 화면: [x, y], t: Date.now(), 후보: 잡음?.후보 };
+}
+function 도형이음(x, y) {
+  const g = 긋기, W = +g.p.dataset.pw, H = +g.p.dataset.ph, q = 쪽좌표(g.p, x, y);
+  if (Math.hypot(x - g.화면[0], y - g.화면[1]) > 8) g.움직임 = true;
+  if (g.글새) return;
+  if (g.도형새) { const 획 = g.획; 획.a[2] = 네자리(q.x); 획.a[3] = 네자리(q.y); 도형다시(획, W, H); g.끝화면 = [x, y]; return 긋기그림(); }
+  if (!g.움직임) return;
+  const 획 = g.고침, dx = q.x - g.q0.x, dy = q.y - g.q0.y;
+  if (획.a) {
+    if (g.끝 != null) { 획.a = [...획.a]; 획.a[2 * g.끝] = 네자리(q.x); 획.a[2 * g.끝 + 1] = 네자리(q.y); }
+    else 획.a = g.옛.a.map((v, k) => 네자리(v + (k & 1 ? dy : dx)));
+    도형다시(획, W, H);
+  } else 획.p = g.옛.p.map((v, k) => 네자리(v + (k & 1 ? dy : dx)));
+  쪽표시그리기(g.p);
+}
+function 도형끝(g, 버림) {
+  if (g.글새) { if (!버림 && !g.움직임) 글판(g.p.dataset.n, [네자리(g.q0.x), 네자리(g.q0.y)], null, g.q0.화소); return; }
+  const 획 = g.고침;
+  if (버림 || !g.움직임) {
+    Object.assign(획, g.옛);
+    if (!버림 && 획.t != null && 펜.도형 === 't') 글판(g.p.dataset.n, null, 획, g.q0.화소);   // 「글」 로 쓴 글을 톡 → 고치기
+    return 쪽표시그리기(g.p);
+  }
+  표시바꿈(g.p.dataset.n, { 고침: 획, 옛: g.옛 });
+}
+// 글 넣기 · 고치기 판 — 단위 = 쪽은 쪽 너비의 화면 화소 · 도면은 배 (글자 크기 화소 ÷ 단위 = 저장하는 크기)
+const 글크기 = { 작게: 14, 보통: 20, 크게: 28 };
+let 글크기고름 = '보통';
+function 글판(열쇠, 자리, 옛획, 단위) {
+  const 가까운 = v => Object.keys(글크기).reduce((a, k) => (Math.abs(글크기[k] - v) < Math.abs(글크기[a] - v) ? k : a), '보통');
+  let 고른 = 옛획 ? 가까운(옛획.w * 단위) : 글크기고름, 바꿈 = false;
+  판열기(`<h3>${옛획 ? '글 고치기' : '글 넣기'} <span class="흐림">· 문서 위에 바로</span></h3>
+    <div class="row"><input id="txtin" type="text" maxlength="80" placeholder="예 : D25 → D29 로" enterkeyhint="done" autocomplete="off"></div>
+    <div class="opt"><span class="lab">크기</span><div class="seg" id="txtsz">${Object.keys(글크기).map(k => `<button data-v="${k}" class="${k === 고른 ? 'on' : ''}">${k}</button>`).join('')}</div></div>
+    <div class="row 끝줄">${옛획 ? '<button class="btn plain warn" id="txtdel">지우기</button>' : ''}<span style="flex:1"></span><button class="btn plain" onclick="판닫기()">닫기</button><button class="btn" id="txtok">${옛획 ? '고치기' : '넣기'}</button></div>`);
+  const 칸 = $('#txtin'); 칸.value = 옛획?.t || '';
+  $('#txtsz').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; 고른 = 글크기고름 = b.dataset.v; 바꿈 = true; $('#txtsz').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
+  const 굵 = () => +(글크기[고른] / 단위).toPrecision(4);
+  const 빼기 = () => { 판닫기(); 표시바꿈(열쇠, { 뺌: 옛획 }); };
+  const 넣기 = () => {
+    const t = 칸.value.replace(/\s+/g, ' ').trim();
+    if (!t) return 옛획 ? 빼기() : 칸.focus();
+    판닫기();
+    if (옛획) { const 옛 = { t: 옛획.t, w: 옛획.w }; Object.assign(옛획, { t, ...(바꿈 ? { w: 굵() } : {}) }); 표시바꿈(열쇠, { 고침: 옛획, 옛 }); }
+    else 표시바꿈(열쇠, { 더함: { c: 펜.색, w: 굵(), p: 자리, t, r: 지금.돌림 } });
+  };
+  $('#txtok').onclick = 넣기;
+  if ($('#txtdel')) $('#txtdel').onclick = 빼기;
+  칸.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); 넣기(); } };
+  setTimeout(() => { 칸.focus(); 칸.setSelectionRange(칸.value.length, 칸.value.length); }, 60);
+}
+function 도면글톡(x, y, 배) {                              // 도면 — 「글」 로 톡 : 쓴 글 위면 고치기 · 빈 곳이면 새 글
+  const 찾음 = [...(지금.표시.쪽.d || [])].reverse().find(획 => {
+    if (획.t == null) return false;
+    const [x0, y0, x1, y1] = 글상자(획.p[0], -획.p[1], 획.w, 획.t, 획.r || 0);
+    return x > x0 && x < x1 && -y > y0 && -y < y1;
+  });
+  글판('d', [+x.toPrecision(9), +y.toPrecision(9)], 찾음 || null, 배);
 }
 function 펜판갱신() {
   $('#penbar').hidden = !펜.켬;
   if (!펜.켬) $('#penpal').hidden = true;
   $('#pen').classList.toggle('on', 펜.켬);
   const 형광 = 형광인가(펜.색);
-  for (const b of $('#penbar').querySelectorAll('[data-m]')) b.classList.toggle('on', 펜.메모 ? b.dataset.m === '메모' : !펜.지우개 && b.dataset.m !== '메모' && (b.dataset.m === '형광') === 형광);
+  for (const b of $('#penbar').querySelectorAll('[data-m]')) b.classList.toggle('on', 펜.메모 ? b.dataset.m === '메모' : 펜.도형 ? b.dataset.m === '도형' : !펜.지우개 && !['메모', '도형'].includes(b.dataset.m) && (b.dataset.m === '형광') === 형광);
+  $('#shapebar').hidden = !펜.켬 || !펜.도형;
+  for (const b of $('#shapebar').querySelectorAll('[data-f]')) b.classList.toggle('on', b.dataset.f === 펜.도형);
   $('#penbar').classList.toggle('메모중', !!펜.메모);
   $('#pencolordot').style.background = 색값(펜.색);
   $('#pencolordot').classList.toggle('형광점', 형광);
@@ -887,7 +1007,7 @@ function 색줄그리기() {                               // 펜이면 7색 · 
   const 형광 = 형광인가(펜.색), 줄 = 형광 ? 형광들 : 펜들;
   $('#penpal').innerHTML = 줄.map(c => `<button class="펜색${c === 펜.색 ? ' on' : ''}" data-c="${c}" aria-label="${펜색표[c][0]}"><i class="${형광 ? '형광점' : ''}" style="background:${색값(c)}"></i><span>${펜색표[c][0]}</span></button>`).join('');
 }
-function 펜끄기() { 펜.켬 = false; 펜.지우개 = false; 펜.메모 = false; 긋기 = null; 도면판?.펜({ ...펜 }); 펜판갱신(); 손모드(); }
+function 펜끄기() { 펜.켬 = false; 펜.지우개 = false; 펜.메모 = false; 펜.도형 = null; 긋기 = null; if (도형선택) 선택바꿈(null); 도면판?.펜({ ...펜 }); 펜판갱신(); 손모드(); }
 $('#pen').addEventListener('click', () => {
   if (펜.켬) return 펜끄기();
   if (!$('#measbar').hidden) 재기끄기();
@@ -897,24 +1017,38 @@ $('#pen').addEventListener('click', () => {
 $('#penpal').addEventListener('click', e => {
   const b = e.target.closest('[data-c]'); if (!b) return;
   펜.색 = b.dataset.c; 형광인가(펜.색) ? (펜.형광색 = 펜.색) : (펜.펜색 = 펜.색); 펜.지우개 = false;
+  if (펜.도형 && 도형선택 && 선택쪽 != null && 도형선택.c !== 펜.색) { const 옛 = { c: 도형선택.c }; 도형선택.c = 펜.색; 표시바꿈(선택쪽, { 고침: 도형선택, 옛 }); }   // 고른 도형 색도 (0.9.4)
   $('#penpal').hidden = true; 펜설정저장();
   도면판?.펜({ ...펜 }); 펜판갱신();
 });
 $('#penbar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.m === '메모') {                       // 위치 메모 (memo.js) — 톡한 자리에 메모
-    펜.메모 = true; 펜.지우개 = false; $('#penpal').hidden = true; 긋기 = null;
+    펜.메모 = true; 펜.도형 = null; 펜.지우개 = false; $('#penpal').hidden = true; 긋기 = null;
     칩('메모 넣을 곳을 톡 · 쪽지는 끌어 옮김');
   }
+  else if (b.dataset.m === '도형') {                  // 도형 (0.9.4) — 위에 작은 줄 · 색은 펜 색
+    펜.도형 = 펜.도형 || 마지막도형; 펜.메모 = false; 펜.지우개 = false; $('#penpal').hidden = true; 긋기 = null;
+    if (형광인가(펜.색)) { 펜.색 = 펜.펜색; 펜설정저장(); }
+    칩(펜.도형 === 't' ? '글 넣을 곳을 톡' : '끌어서 그림 · 그린 것은 톡 → 옮기기 · 크기');
+  }
   else if (b.dataset.m) {                              // 펜 ↔ 형광 — 각자 마지막 색으로
-    const 형광 = b.dataset.m === '형광', 메모였음 = 펜.메모; 펜.메모 = false;
+    const 형광 = b.dataset.m === '형광', 메모였음 = 펜.메모 || !!펜.도형; 펜.메모 = false; 펜.도형 = null;
     if (형광인가(펜.색) === 형광 && !펜.지우개 && !메모였음) { $('#penpal').hidden = !$('#penpal').hidden; if (!$('#penpal').hidden) 색줄그리기(); return; }
     펜.색 = 형광 ? 펜.형광색 : 펜.펜색; 펜.지우개 = false; $('#penpal').hidden = true; 펜설정저장();
   }
   else if (b.id === 'pencolor') { 펜.지우개 = false; 펜.메모 = false; $('#penpal').hidden = !$('#penpal').hidden; 색줄그리기(); }
-  else if (b.id === 'eraser') { 펜.지우개 = !펜.지우개; 펜.메모 = false; $('#penpal').hidden = true; }
+  else if (b.id === 'eraser') { 펜.지우개 = !펜.지우개; 펜.메모 = false; 펜.도형 = null; $('#penpal').hidden = true; }
   else if (b.id === 'undo') 되돌리기();
   else if (b.id === 'penoff') return 펜끄기();
+  if (!펜.도형 && 도형선택) 선택바꿈(null);
+  도면판?.펜({ ...펜 }); 펜판갱신();
+});
+$('#shapebar').addEventListener('click', e => {
+  const b = e.target.closest('[data-f]'); if (!b) return;
+  펜.도형 = 마지막도형 = b.dataset.f; 펜.지우개 = false; 펜.메모 = false;
+  if (펜.도형 === 't' && 도형선택) 선택바꿈(null);
+  칩(펜.도형 === 't' ? '글 넣을 곳을 톡 · 쓴 글을 톡 → 고치기' : '끌어서 그림');
   도면판?.펜({ ...펜 }); 펜판갱신();
 });
 
@@ -992,7 +1126,7 @@ function 자리적기() {
     for (const pg of $('#pages').children) if (pg.offsetTop + pg.offsetHeight > r.scrollTop) { 쪽 = pg; break; }
     if (!쪽 || !쪽.offsetHeight) return;
     const p = Number(쪽.dataset.n), 비 = Math.max(0, (r.scrollTop - 쪽.offsetTop) / 쪽.offsetHeight), 옆 = r.scrollWidth - r.clientWidth;
-    if (p > 0 || 비 > 0.02 || 확대 > 1.01) o = { p, r: +비.toFixed(4), c: 보는쪽(), n: 지금.쪽수, ...(확대 > 1.01 ? { z: +확대.toFixed(3), x: 옆 > 0 ? +(r.scrollLeft / 옆).toFixed(4) : 0 } : {}) };
+    if (p > 0 || 비 > 0.02 || Math.abs(확대 - 1) > 0.01) o = { p, r: +비.toFixed(4), c: 보는쪽(), n: 지금.쪽수, ...(Math.abs(확대 - 1) > 0.01 ? { z: +확대.toFixed(3), x: 옆 > 0 ? +(r.scrollLeft / 옆).toFixed(4) : 0 } : {}) };
   } else if (!f.hidden) {
     const 끝 = f.scrollHeight - f.clientHeight, 비 = 끝 > 0 ? f.scrollTop / 끝 : 0;
     const 시트 = [...$('#flowin').querySelectorAll('.시트탭 button')].findIndex(b => b.classList.contains('on'));
@@ -1009,10 +1143,10 @@ function 자리되살리기() {
   const o = 자리읽기(지금.d); if (!o) return;
   if (지금.쪽수 && o.p != null && !$('#reader').hidden) {
     const pg = $('#pages').children[Math.min(지금.쪽수 - 1, o.p)], r = $('#reader'); if (!pg) return;
-    if (o.z > 1.01) { 확대 = Math.min(4, o.z); $('#pages').style.width = (100 * 확대) + '%'; 손모드(); }
+    if (o.z && Math.abs(o.z - 1) > 0.01) { 확대 = Math.min(4, Math.max(0.3, o.z)); $('#pages').style.width = (100 * 확대) + '%'; 손모드(); }
     r.scrollTop = pg.offsetTop + (o.r || 0) * pg.offsetHeight;
     if (o.x) r.scrollLeft = o.x * (r.scrollWidth - r.clientWidth);
-    이어봄알림(`보던 ${Math.min(지금.쪽수, (o.c ?? o.p) + 1)}${단위()}에서 이어 봄${o.z > 1.01 ? ` · ${Math.round(o.z * 100)}%` : ''}`);
+    이어봄알림(`보던 ${Math.min(지금.쪽수, (o.c ?? o.p) + 1)}${단위()}에서 이어 봄${o.z && Math.abs(o.z - 1) > 0.01 ? ` · ${Math.round(o.z * 100)}%` : ''}`);
   } else if (o.f != null && !$('#flow').hidden) {
     if (o.s) $('#flowin').querySelectorAll('.시트탭 button')[o.s]?.click();
     const f = $('#flow'); f.scrollTop = o.f * (f.scrollHeight - f.clientHeight);
@@ -1227,7 +1361,7 @@ async function 사본보내기(k) {
 let 확대 = 1, 집기 = null, 톡시각 = 0;
 function 확대하기(새, cx, cy) {
   const r = $('#reader'), 옛 = 확대;
-  새 = Math.min(4, Math.max(1, 새));
+  새 = Math.min(4, Math.max(최소확대(), 새));
   if (Math.abs(새 - 옛) < 0.001) return;
   const box = r.getBoundingClientRect();
   const px = r.scrollLeft + (cx - box.left), py = r.scrollTop + (cy - box.top);
@@ -1235,6 +1369,14 @@ function 확대하기(새, cx, cy) {
   $('#pages').style.width = (100 * 확대) + '%';
   r.scrollLeft = px * 새 / 옛 - (cx - box.left);
   r.scrollTop = py * 새 / 옛 - (cy - box.top);
+}
+// 줄이기 (10-05 · 전무님 「JPG 가 화면에 맞게 커져 있는데 축소가 안 됨」) — 1배(화면 너비에 맞춤) 아래로는
+//   지금 보는 쪽 하나가 화면에 통째로 들어가는 크기까지 (적어도 30%) · 줄이면 가운데에
+function 최소확대() {
+  const r = $('#reader'), pg = $('#pages').children[지금?.쪽수 ? 보는쪽() : 0];
+  if (!pg || !pg.offsetHeight || !pg.offsetWidth) return 1;
+  const 높이1 = pg.offsetHeight * (r.clientWidth - 20) / pg.offsetWidth;          // 1배일 때 쪽 높이 (안쪽 여백 10 · 10)
+  return Math.min(1, Math.max(0.3, (r.clientHeight - 20) / 높이1));
 }
 function 선명하게() {        // 손을 뗀 뒤 보이는 쪽만 더 촘촘히 다시 그림 — PDF 만 (그림은 원본이라 그대로)
   if (!지금?.쪽수) return;
@@ -1264,7 +1406,7 @@ const 손각 = (a, b) => Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX
     끌기 = null;
   } else if (e.touches.length === 1) {
     const t = Date.now(), p = e.touches[0];
-    if (t - 톡시각 < 300) { 확대하기(확대 > 1.05 ? 1 : 2, p.clientX, p.clientY); 손모드(); 선명하게(); 톡시각 = 0; 끌기 = null; return; }
+    if (t - 톡시각 < 300) { 확대하기(Math.abs(확대 - 1) > 0.05 ? 1 : 2, p.clientX, p.clientY); 손모드(); 선명하게(); 톡시각 = 0; 끌기 = null; return; }
     톡시각 = t;
     끌기 = 확대 > 1.01 ? { x: p.clientX, y: p.clientY, vx: 0, vy: 0, t } : null;
   }

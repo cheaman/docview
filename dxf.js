@@ -481,7 +481,7 @@ const 변점 = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m
     }
     for (const 획 of 획들()) if (형광인가(획.c)) 획그리기(획);      // 형광 먼저 · 펜은 그 위
     for (const 획 of 획들()) if (!형광인가(획.c)) 획그리기(획);
-    if (긋기?.획 && 형광인가(긋기.획.c)) 획그리기(긋기.획);              // 긋고 있는 형광 (반투명이라 토막으로 덧그리면 구슬처럼 짙어짐)
+    if (긋기?.획 && (형광인가(긋기.획.c) || 긋기.도형)) 획그리기(긋기.획);   // 긋고 있는 형광 (반투명이라 토막으로 덧그리면 구슬처럼 짙어짐) · 그리는 중인 도형
     재기그리기();
     사진찍기();
     자료.그린뒤?.();
@@ -491,6 +491,14 @@ const 변점 = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m
     ctx.save();
     const d = 내보낼배율 || devicePixelRatio || 1;
     ctx.setTransform(d, 0, 0, d, 0, 0); 판돌림(ctx);
+    if (획.t != null) {                              // 글 (0.9.4) — 쓸 때의 방향으로 늘 똑바로 · 바탕색 테두리
+      const fs = 획.w * 배; if (fs < 2) return ctx.restore();
+      ctx.translate(p[0] * 배 + tx, ty - p[1] * 배); ctx.rotate(-(획.r || 0) * Math.PI / 2);
+      ctx.font = `700 ${fs.toFixed(1)}px Pretendard, system-ui, sans-serif`; ctx.textBaseline = 'top'; ctx.lineJoin = 'round';
+      ctx.lineWidth = fs * 0.14; ctx.strokeStyle = 어둠 ? '#111418' : '#ffffff'; ctx.strokeText(획.t, 0, 0);
+      ctx.fillStyle = 색값(획.c, 어둠); ctx.fillText(획.t, 0, 0);
+      return ctx.restore();
+    }
     if (형광인가(획.c)) {                            // 형광 — 흰 바탕은 곱하기(글 · 선이 또렷) · 검은 바탕은 반투명
       ctx.globalCompositeOperation = 어둠 ? 'source-over' : 'multiply'; ctx.globalAlpha = 어둠 ? 0.4 : 0.85;
     }
@@ -591,17 +599,18 @@ const 변점 = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m
   const 각 = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
   캔버스.addEventListener('pointerdown', e => {
     캔버스.setPointerCapture(e.pointerId); 손.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (손.size === 1 && 펜.켬 && !펜.메모) {
+    if (손.size === 1 && 펜.켬 && !펜.메모 && 펜.도형 !== 't') {
       const [x, y] = 도면점(e.clientX, e.clientY);
       if (펜.지우개) { 긋기 = { 지우개: true }; 지우기(x, y); }
+      else if (펜.도형) 긋기 = { 도형: true, 획: { c: 펜.색, w: 획굵기(펜.색) / 배, f: 펜.도형, a: [x, y, x, y], p: [x, y] }, t: Date.now(), 화면: [e.clientX, e.clientY] };   // 도형 (0.9.4) — 끌어서 반듯하게
       else { 긋기 = { 획: { c: 펜.색, w: 획굵기(펜.색) / 배, p: [x, y] }, t: Date.now(), 화면: [e.clientX, e.clientY] }; 형광인가(펜.색) ? 다시() : 획그리기(긋기.획); }
       톡시각 = 0; 앞집기 = null; return;
     }
     if (손.size === 2 && 긋기) {                   // 두 번째 손가락 → 막 그은 짧은 획은 버리고 키우기로
-      if (긋기.획 && (긋기.획.p.length < 12 || Date.now() - 긋기.t < 250)) 다시(); else 긋기끝();
+      if (긋기.획 && ((!긋기.도형 && 긋기.획.p.length < 12) || Date.now() - 긋기.t < 250)) 다시(); else if (긋기.획) 긋기끝();
       긋기 = null;
     }
-    const 톡모드 = 재기.켬 || (펜.켬 && 펜.메모);         // 재기 · 메모 — 톡 = 점 / 메모 자리 · 끌면 밀기
+    const 톡모드 = 재기.켬 || (펜.켬 && (펜.메모 || 펜.도형 === 't'));   // 재기 · 메모 · 글 — 톡 = 점 / 메모 · 글 자리 · 끌면 밀기
     재기톡 = 톡모드 && 손.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now() } : null;
     if (톡모드) { 앞집기 = null; 비틀기 = null; return; }        // 재기 중에는 두 번 톡 키우기 없음 (톡 = 점 찍기)
     if (손.size === 1 && !펜.켬) { const t = Date.now(); if (t - 톡시각 < 300) { 키우기(2, e.clientX, e.clientY); 톡시각 = 0; } else 톡시각 = t; }
@@ -613,6 +622,7 @@ const 변점 = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m
     if (손.size === 1 && 긋기) {
       const [x, y] = 도면점(e.clientX, e.clientY);
       if (긋기.지우개) return 지우기(x, y);
+      if (긋기.도형) { const 획 = 긋기.획; 획.a[2] = x; 획.a[3] = y; 획.p = 도형점(획.f, ...획.a, 획.w); 긋기.끝화면 = [e.clientX, e.clientY]; return 다시(); }
       const p = 긋기.획.p, n = p.length;
       if (Math.hypot((x - p[n - 2]) * 배, (y - p[n - 1]) * 배) < 1.5) return;   // 1.5 화소 안쪽은 건너뜀
       p.push(x, y); 긋기.화면.push(e.clientX, e.clientY);
@@ -649,6 +659,7 @@ const 변점 = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m
         재기.점.push(...(붙 || [x, y])); 재기.붙음.push(!!붙);
         재기알림(); 다시();
       } else if (펜.켬 && 펜.메모) 자료.메모톡?.(x, y);
+      else if (펜.켬 && 펜.도형 === 't') 자료.글톡?.(x, y, 배);
     }
     재기톡 = null;
     if (긋기 && 손.size === 0) { if (긋기.획) 긋기끝(); 긋기 = null; }
@@ -660,15 +671,22 @@ const 변점 = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m
   };
   캔버스.addEventListener('pointerup', 뗌); 캔버스.addEventListener('pointercancel', 뗌);
   function 긋기끝() {
+    if (긋기.도형) {                                  // 도형 — 12 화소보다 짧으면 버림
+      const 획 = 긋기.획, 끝 = 긋기.끝화면, 짧음 = !끝 || Math.hypot(끝[0] - 긋기.화면[0], 끝[1] - 긋기.화면[1]) < 12; 긋기 = null;
+      if (!짧음) { 획.p = 획.p.map(v => +v.toPrecision(9)); 획.a = 획.a.map(v => +v.toPrecision(9)); 자료.표시바뀜?.({ 더함: 획 }); }
+      return 다시();
+    }
     const 획 = 긋기.획, 곧은 = 형광인가(획.c) && 곧게(긋기.화면);
     if (곧은) 획.p = [...도면점(곧은[0], 곧은[1]), ...도면점(곧은[2], 곧은[3])];   // 형광을 거의 곧게 그었으면 반듯한 줄로
     획.p = 획.p.map(v => +v.toPrecision(9)); 긋기 = null; 자료.표시바뀜?.({ 더함: 획 }); 다시();
   }
-  function 지우기(x, y) {                            // 손가락 둘레 14 화소 안에 닿은 획을 통째로 뺌
+  function 지우기(x, y) {                            // 손가락 둘레 14 화소 안에 닿은 획을 통째로 뺌 (0.9.4 — 꺾인 점만이 아니라 선 토막 · 글은 글 상자)
     const 둘레 = 14 / 배;
     for (const 획 of [...획들()]) {
-      const p = 획.p, 굵 = 둘레 + 획.w / 2;
-      for (let k = 0; k < p.length; k += 2) if (Math.abs(p[k] - x) < 굵 && Math.abs(p[k + 1] - y) < 굵) { 자료.표시바뀜?.({ 뺌: 획 }); 다시(); break; }
+      let 닿음;
+      if (획.t != null) { const [x0, y0, x1, y1] = 글상자(획.p[0], -획.p[1], 획.w, 획.t, 획.r || 0); 닿음 = x > x0 - 둘레 && x < x1 + 둘레 && -y > y0 - 둘레 && -y < y1 + 둘레; }
+      else 닿음 = 선거리(획.p, x, y) < 둘레 + 획.w / 2;
+      if (닿음) { 자료.표시바뀜?.({ 뺌: 획 }); 다시(); }
     }
   }
   캔버스.addEventListener('wheel', e => { e.preventDefault(); 키우기(e.deltaY < 0 ? 1.25 : 0.8, e.clientX, e.clientY); }, { passive: false });
