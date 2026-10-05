@@ -1,12 +1,13 @@
 /* 문서 보기 — 모양 (2026-10-04 DSM 부품 v1.0 바름 · 목업 1_읽을거리\DSM_목업.html · 처음 승인은 시안 B 종이)
    색은 :root 색 이름에만 · 어둡게는 폰 설정을 따라 이름만 바꾼다
-   DSM : 대표색 주황 하나(--accent) · 옅은 바탕 위 주황 글씨는 --accent-ink · 글꼴 프리텐다드(dsm/dsm.css 가 묶은 파일을 부름) · 테두리 띠 없음
+   DSM v1.4 (10-06) : 화면 색 밝게 연두 / 어둡게 주황(--accent · 흰 바탕 위 점 · 막대 · 테두리) · 큰 단추 --btn · --on-btn (밝게 짙은 연두 + 흰 / 어둡게 주황 + 검정) · 로고 · 아이콘은 주황 그대로
+   (옛 v1.0 : 대표색 주황 하나(--accent)) · 옅은 바탕 위 주황 글씨는 --accent-ink · 글꼴 프리텐다드(dsm/dsm.css 가 묶은 파일을 부름) · 테두리 띠 없음
    파일 딱지 색(PDF 빨강 · 한글 파랑 …)은 그대로 (전무님 10-04 「A 색 그대로」) · 펜 · 형광 색도 그대로 */
 
 /* ① 색 이름 */
 :root {
   --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f2; --text:#1d1d1f; --sub:#6e6e73; --line:#e8e8ed; --rule:#d2d2d7;
-  --accent:#e8743b; --on-accent:#ffffff; --accent-soft:#fcefe7; --accent-ink:#a84a1a; --bar:#f5f5f7; --bar-text:#1d1d1f; --faint:#aeaeb2;
+  --accent:#568800; --on-accent:#ffffff; --accent-soft:#eef7dc; --accent-ink:#3d6400; --btn:#3f7300; --on-btn:#ffffff; --bar:#f5f5f7; --bar-text:#1d1d1f; --faint:#aeaeb2;
   --page:#ffffff; --page-text:#1d1d1f; --reader:#ebebef;
   --shadow:0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.06);
   --radius:14px; --font:"Pretendard","Pretendard Variable","Malgun Gothic","맑은 고딕",system-ui,sans-serif; --read-font:var(--font);
@@ -15,7 +16,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg:#000000; --surface:#1c1c1e; --surface2:#2c2c2e; --text:#f5f5f7; --sub:#a1a1a6; --line:#38383a; --rule:#48484a;
-    --accent:#e8743b; --on-accent:#ffffff; --accent-soft:#3a2a20; --accent-ink:#f0955f; --bar:#000000; --bar-text:#f5f5f7; --faint:#636366;
+    --accent:#e8743b; --on-accent:#ffffff; --accent-soft:#3a2a20; --accent-ink:#f0955f; --btn:#e8743b; --on-btn:#0b0b0c; --bar:#000000; --bar-text:#f5f5f7; --faint:#636366;
     --page:#1c1c1e; --page-text:#e5e5ea; --reader:#000000; --shadow:0 0 0 1px #2c2c2e;
     color-scheme:dark;
   }
@@ -50,8 +51,8 @@ button { font:inherit; color:inherit; background:none; border:0; padding:0; curs
 .item .n { font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .item .s { font-size:13px; color:var(--sub); }
 .item .more { width:40px; height:40px; display:grid; place-items:center; color:var(--sub); border-radius:50%; }
-.fab { position:fixed; right:16px; bottom:calc(20px + env(safe-area-inset-bottom)); display:flex; align-items:center; gap:6px; background:var(--accent); color:var(--on-accent); border-radius:999px; padding:13px 20px; font-weight:700; font-size:15px; box-shadow:0 6px 16px rgba(0,0,0,.2); }
-.fab .ico { stroke:var(--on-accent); }
+.fab { position:fixed; right:16px; bottom:calc(20px + env(safe-area-inset-bottom)); display:flex; align-items:center; gap:6px; background:var(--btn); color:var(--on-btn); border-radius:999px; padding:13px 20px; font-weight:700; font-size:15px; box-shadow:0 6px 16px rgba(0,0,0,.2); }
+.fab .ico { stroke:var(--on-btn); }
 
 .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:26px; gap:12px; color:var(--sub); }
 .empty .big { width:84px; height:84px; border-radius:24px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; }
@@ -84,7 +85,7 @@ button { font:inherit; color:inherit; background:none; border:0; padding:0; curs
 .sheet h3 { margin:0 0 10px; font-size:16px; }
 .sheet .row { display:flex; gap:10px; align-items:center; }
 .sheet input { flex:1; font:inherit; font-size:18px; padding:10px 14px; border-radius:12px; border:1px solid var(--line); background:var(--surface2); color:var(--text); }
-.btn { padding:11px 18px; border-radius:12px; background:var(--accent); color:var(--on-accent); font-weight:700; }
+.btn { padding:11px 18px; border-radius:12px; background:var(--btn); color:var(--on-btn); font-weight:700; }
 .btn.plain { background:var(--surface2); color:var(--text); }
 .act { display:block; width:100%; text-align:left; padding:14px 6px; font-size:16px; border-bottom:1px solid var(--line); }
 .act:last-child { border-bottom:0; }
@@ -170,7 +171,7 @@ mark.cur { background:#ff9f2e; }
 .flowin .엑셀 { font-family:var(--font); }
 .시트탭 { display:flex; gap:6px; overflow-x:auto; padding:0 0 10px; position:sticky; top:-18px; background:inherit; z-index:2; }
 .시트탭 button { flex:none; padding:6px 12px; border-radius:999px; background:rgba(127,127,127,.16); color:inherit; font-size:14px; white-space:nowrap; }
-.시트탭 button.on { background:var(--accent); color:var(--on-accent); font-weight:700; }
+.시트탭 button.on { background:var(--btn); color:var(--on-btn); font-weight:700; }
 .flowin table.시트 { font-size:.82em; border-collapse:collapse; min-width:0; }
 .flowin table.시트 th { background:rgba(127,127,127,.16); color:inherit; opacity:.75; font-weight:600; font-size:.85em; padding:.2em .5em; border:1px solid var(--rule); }
 .flowin table.시트 tr > th:first-child { text-align:right; white-space:nowrap; min-width:2.4em; }
@@ -223,7 +224,7 @@ body:has(#viewer:not([hidden]) #shapebar:not([hidden])) .chip, body:has(#viewer:
 .b-html { background:#e8710a; }
 .flowin .html문서 pre { white-space:pre-wrap; font-size:.9em; background:rgba(127,127,127,.1); padding:.6em .8em; border-radius:6px; }
 .flowin .html문서 blockquote { margin:.4em 0; padding-left:.9em; border-left:3px solid var(--rule); }
-.flowin .html문서 .html링크 { color:var(--accent-ink); text-decoration:underline; text-decoration-color:rgba(232,116,59,.45); }
+.flowin .html문서 .html링크 { color:var(--accent-ink); text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--accent-ink) 45%, transparent); }
 .flowin .html문서 ul, .flowin .html문서 ol { padding-left:1.4em; margin:.3em 0 .6em; }
 .flowin .html문서 hr { border:0; border-top:1px solid var(--rule); margin:1em 0; }
 .flowin .html문서 img.그림 { max-width:100%; height:auto; }
@@ -308,7 +309,7 @@ i.형광점 { border-radius:7px !important; }
 .zip길 button.지금 { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; }
 .zip길 .사이 { color:var(--sub); }
 .zip요약 { font-size:13px; color:var(--sub); margin:0 6px 10px; }
-.zip모두 { display:block; width:100%; margin:0 0 12px; padding:13px 14px; border-radius:var(--radius); background:var(--accent); color:var(--on-accent); font-weight:700; font-size:15px; text-align:center; }
+.zip모두 { display:block; width:100%; margin:0 0 12px; padding:13px 14px; border-radius:var(--radius); background:var(--btn); color:var(--on-btn); font-weight:700; font-size:15px; text-align:center; }
 .zipbox .item .s .자물쇠 { color:#c0392b; }
 
 /* PPT 보기 (10-04 · ppt.js) — 목록 딱지 · 「글로」 의 장 머리 · 발표자 메모 */
@@ -406,7 +407,7 @@ i.형광점 { border-radius:7px !important; }
 .item:has(.찾은줄) { align-items:flex-start; }
 
 /* ── 0.9.6 ④ 사진 여러 장 → PDF 한 권 ── */
-.selfoot .새것 { background:var(--accent); color:var(--on-accent); }
+.selfoot .새것 { background:var(--btn); color:var(--on-btn); }
 .pdf썸들 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:4px 0 6px; max-height:38vh; overflow-y:auto; }
 .pdf썸 { position:relative; aspect-ratio:3/4; border-radius:8px; overflow:hidden; background:var(--surface2); touch-action:none; user-select:none; -webkit-user-select:none; }
 .pdf썸 img { width:100%; height:100%; object-fit:cover; pointer-events:none; -webkit-user-drag:none; }
@@ -468,5 +469,5 @@ i.형광점 { border-radius:7px !important; }
 .골안내 { position:fixed; left:12px; right:12px; top:calc(10px + env(safe-area-inset-top)); text-align:center; background:rgba(20,22,26,.86); color:#fff; font-size:13px; padding:8px 10px; border-radius:10px; pointer-events:none; z-index:1; }
 .골바 { position:fixed; left:0; right:0; bottom:0; display:flex; gap:6px; padding:8px 8px calc(12px + env(safe-area-inset-bottom)); background:var(--surface); box-shadow:0 -1px 0 var(--line); z-index:1; }
 .골바 button { flex:1 1 0; min-width:0; padding:12px 2px; border:0; border-radius:12px; background:var(--bg); color:var(--text); font:inherit; font-size:14px; font-weight:700; white-space:nowrap; }
-.골바 .주 { background:var(--accent); color:var(--on-accent); }
+.골바 .주 { background:var(--btn); color:var(--on-btn); }
 .골치수.위 { top:auto; bottom:calc(100% + 10px); }
