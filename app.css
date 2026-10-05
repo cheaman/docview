@@ -456,3 +456,17 @@ i.형광점 { border-radius:7px !important; }
 .tlist .목줄 .글 { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tlist .목줄 .쪽번 { font-size:12px; color:var(--sub); flex:none; }
 .tlist .목줄.깊1 { padding-left:20px; font-size:14px; color:var(--sub); } .tlist .목줄.깊2 { padding-left:36px; font-size:13px; color:var(--sub); } .tlist .목줄.깊3 { padding-left:52px; font-size:13px; color:var(--sub); }
+
+/* ── 0.9.10 골라 복사 — 「복사」 → 틀 · 귀 넷 · 아래 단추 줄 (목업 1_읽을거리\골라복사_목업.html) ── */
+.골 { position:fixed; inset:0; z-index:7; touch-action:none; user-select:none; -webkit-user-select:none; }
+.골틀 { position:fixed; border:2px solid #fff; border-radius:2px; box-shadow:0 0 0 9999px rgba(0,0,0,.5); }
+.골틀 i { position:absolute; width:24px; height:24px; border-radius:50%; background:#fff; border:3px solid var(--accent); box-sizing:border-box; }
+.골틀 i::before { content:''; position:absolute; inset:-14px; }              /* 손가락 자리 넓힘 */
+.골틀 i[data-g="lt"] { left:-13px; top:-13px; } .골틀 i[data-g="rt"] { right:-13px; top:-13px; }
+.골틀 i[data-g="lb"] { left:-13px; bottom:-13px; } .골틀 i[data-g="rb"] { right:-13px; bottom:-13px; }
+.골치수 { position:absolute; left:50%; top:8px; transform:translateX(-50%); background:rgba(20,22,26,.86); color:#fff; font-size:13px; padding:2px 10px; border-radius:999px; white-space:nowrap; pointer-events:none; }
+.골안내 { position:fixed; left:12px; right:12px; top:calc(10px + env(safe-area-inset-top)); text-align:center; background:rgba(20,22,26,.86); color:#fff; font-size:13px; padding:8px 10px; border-radius:10px; pointer-events:none; z-index:1; }
+.골바 { position:fixed; left:0; right:0; bottom:0; display:flex; gap:6px; padding:8px 8px calc(12px + env(safe-area-inset-bottom)); background:var(--surface); box-shadow:0 -1px 0 var(--line); z-index:1; }
+.골바 button { flex:1 1 0; min-width:0; padding:12px 2px; border:0; border-radius:12px; background:var(--bg); color:var(--text); font:inherit; font-size:14px; font-weight:700; white-space:nowrap; }
+.골바 .주 { background:var(--accent); color:var(--on-accent); }
+.골치수.위 { top:auto; bottom:calc(100% + 10px); }

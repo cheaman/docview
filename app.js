@@ -795,6 +795,7 @@ let 지금 = null;           // { id, ext, 쪽들, 쪽수 }
 // 덧 (10-04 · ZIP) : 깊이 — ZIP 에서 꺼내 연 문서는 1 (ZIP 속 ZIP 은 2 …) · 압축에서 — 뒤로 가면 돌아갈 ZIP { id, 폴더, 깊이 } · 폴더 — ZIP 을 다시 열 때 그 폴더로
 function 열기(id, 쌓기, 덧 = {}) {
   자리적기();                                         // 보던 문서의 자리 (ZIP 에서 다른 문서로 · PPT 보는 방식 바꿈)
+  if (골) 골닫기(false);                              // 골라 복사 틀이 떠 있었으면 (0.9.10)
   고름 = null;                                       // 고르기 중에 새 파일을 받으면 고르기는 끝
   목록그리기();
   const d = 목록.find(x => x.id === id);
@@ -1943,12 +1944,14 @@ $('#share').addEventListener('click', 보내기판);
 
 // ④-6b 복사 (10-04 · 목업 승인) — 지금 보이는 쪽(그림 · 도면)에 표시를 입혀 클립보드로 → 다른 앱에서 길게 눌러 붙여넣기 · 원본은 안 고침
 //   보내기 「지금 보는 쪽만 → 그림」 과 같은 그림 · 클립보드는 png
-async function 지금그림캔버스() {
+//   자름 = { x0, y0, x1, y1 } (보는 쪽 · 도면 화면의 0 ~ 1 비율) — 골라 복사(0.9.10)가 줌 · 메모 목록 띠는 자른 뒤에 붙임
+async function 지금그림캔버스(자름) {
   const d = 지금.d, id = 지금.id, 번호표 = { n: 0, 목록: [] };
   let c = null;
   if (지금.쪽수) {
     const n = 보는쪽(), pg = $('#pages').children[n], pw = +pg.dataset.pw;
-    const 주소 = await 쪽길().쪽(id, n, Math.round(Math.min(2000, Math.max(800, pw * 2)))), im = await 보내기.그림받기(주소); 그림주소놓기(주소);
+    const 몫 = 자름 ? Math.max(0.25, Math.max(자름.x1 - 자름.x0, 자름.y1 - 자름.y0)) : 1;   // 작게 고를수록 크게 그려 글씨가 안 뭉개지게 (긴 변 2800 까지)
+    const 주소 = await 쪽길().쪽(id, n, Math.round(Math.min(자름 ? 2800 : 2000, Math.max(800, pw * 2 / 몫)))), im = await 보내기.그림받기(주소); 그림주소놓기(주소);
     c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽[n], d.메모);
     보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === String(n)), { 돌: 지금.돌림, 번호표, 쪽: n + 1 });
   } else if (지금.그림) {
@@ -1959,20 +1962,30 @@ async function 지금그림캔버스() {
     보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === 'd'), { 도면: c.점, 배율: c.배율, 번호표 });
     if (d.메모) 보내기.쪽지상자(c.getContext('2d'), c.width, d.메모);
   }
+  if (c && 자름) c = 잘라내기(c, 자름);
   if (c && 번호표.목록.length) c = 보내기.아래목록(c, 번호표.목록);
   return c;
 }
-$('#copy').addEventListener('click', () => {
-  if (!지금 || 보내는중) return;
+function 잘라내기(c, r) {
+  const x = Math.round(r.x0 * c.width), y = Math.round(r.y0 * c.height);
+  const w = Math.max(1, Math.round(r.x1 * c.width) - x), h = Math.max(1, Math.round(r.y1 * c.height) - y);
+  const o = document.createElement('canvas'); o.width = w; o.height = h;
+  o.getContext('2d').drawImage(c, x, y, w, h, 0, 0, w, h);
+  c.width = c.height = 0;
+  return o;
+}
+function 그림복사(만들기) {                                         // 만들기 = () => 캔버스 약속 · 누른 손가락 안에서 불러야 함 (아이폰)
   const 긴칩 = 말 => { 칩(말); clearTimeout(칩시계); 칩시계 = setTimeout(() => ($('#chip').hidden = true), 2800); };
+  let 크기 = '';
   const 그림약속 = (async () => {
-    const c = await 지금그림캔버스(); if (!c) throw new Error('복사할 그림 없음');
+    const c = await 만들기(); if (!c) throw new Error('복사할 그림 없음');
+    크기 = `${c.width} × ${c.height} `;
     const b = await new Promise(ok => c.toBlob(ok, 'image/png')); c.width = c.height = 0;
     if (!b) throw new Error('그림 만들기 실패 (메모리)');
     return b;
   })();
   칩('복사하는 중…');
-  const 끝 = p => p.then(() => 긴칩('📋 복사됨 → 다른 앱에서 길게 눌러 붙여넣기'), e => { $('#chip').hidden = true; 알림(`<b>복사 안 됨</b><div class="sm">${글(e?.message || e)} → 「보내기」 로</div>`); });
+  const 끝 = p => p.then(() => 긴칩(`📋 복사됨 ${크기}→ 다른 앱에서 길게 눌러 붙여넣기`), e => { $('#chip').hidden = true; 알림(`<b>복사 안 됨</b><div class="sm">${글(e?.message || e)} → 「보내기」 로</div>`); });
   if (다리.copyImage) {                                             // 아이폰 웹앱 · PC — 누른 손가락 안에서 «바로» 불러야 함 (그림은 약속으로 넘김)
     let p; try { p = Promise.resolve(다리.copyImage(그림약속)); } catch (e) { p = Promise.reject(e); }
     return 끝(p);
@@ -1988,7 +2001,125 @@ $('#copy').addEventListener('click', () => {
     }
     if (!다리.copyEnd()) throw new Error('클립보드에 못 넣음');
   }));
-});
+}
+$('#copy').addEventListener('click', () => { if (지금 && !보내는중) 골라열기(); });
+
+// ④-6c 골라 복사 (0.9.10 · 목업 1_읽을거리\골라복사_목업.html · 전무님 「복사 누르면 틀 · 복사 · 보내기 · 새 그림 · 그림 + PDF · PPT + 도면」)
+//   「복사」 → 틀 (처음 = 보는 쪽 중 화면에 보이는 만큼 → 바로 「복사」 = 전처럼 통째) · 귀 끌기 = 크기 · 틀 안 끌기 = 옮김 · 틀 밖 끌기 = 새로 그림
+//   틀이 거의 전체(95% 넘게 · 처음)면 틀 안을 끌어도 새로 그림 — 처음엔 «틀 밖» 이 없어서 (시험에서 찾음)
+//   틀은 보는 쪽(도면은 도면 화면) 안에서만 · 펜 · 형광 · 메모 표시째 · 원본 안 고침 · 틀 띄운 동안 확대 · 밀기는 안 됨 (먼저 키우고 띄움)
+let 골 = null;                                                       // { 판:DOMRect(쪽 전체) · 한:{l,t,r,b}(고를 수 있는 곳) · 틀:{l,t,r,b} }
+function 골판() {
+  if (지금.쪽수 || 지금.그림) {
+    const pg = 지금.그림 ? $('#pages .pg') : $('#pages').children[보는쪽()];
+    return pg ? { 판: pg.getBoundingClientRect(), 보는: $('#reader').getBoundingClientRect() } : null;
+  }
+  if (도면판) { const r = $('#cad').getBoundingClientRect(); return { 판: r, 보는: r }; }
+  return null;
+}
+function 골라열기() {
+  const g = 골판();
+  if (!g) return 알림판('이 문서는 복사 안 됨 → 「보내기」 로');
+  찾기닫기(); 펜끄기(); 재기끄기();
+  const { 판, 보는 } = g;
+  const 한 = { l: Math.max(판.left, 보는.left), t: Math.max(판.top, 보는.top), r: Math.min(판.right, 보는.right), b: Math.min(판.bottom, 보는.bottom) };
+  if (한.r - 한.l < 20 || 한.b - 한.t < 20) return 알림판('보는 쪽이 화면에 안 보임 → 쪽을 화면에 놓고 다시');
+  골 = { 판, 한, 틀: { ...한 } };
+  let el = $('#crop');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'crop'; el.className = '골';
+    el.innerHTML = '<div class="골안내">끌어서 고르기 · 귀 = 크기 · 틀 안 = 옮김</div><div class="골틀"><span class="골치수"></span><i data-g="lt"></i><i data-g="rt"></i><i data-g="lb"></i><i data-g="rb"></i></div>'
+      + '<div class="골바"><button data-a="닫기">취소</button><button data-a="복사" class="주">📋 복사</button><button data-a="보내기">⇪ 보내기</button><button data-a="새그림">＋ 새 그림</button></div>';
+    document.body.append(el);
+    골손잡이(el);
+    el.querySelector('.골바').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) 골동작(b.dataset.a); });
+  }
+  el.hidden = false;
+  if (history.state?.v !== '골라') history.pushState({ v: '골라' }, '');
+  골그리기();
+}
+let 골뒤로 = false;                                                  // 틀을 닫으며 기록 한 칸을 되돌릴 때 popstate 가 다른 화면을 닫지 않게
+function 골닫기(뒤로 = true) {
+  if (!골) return;
+  골 = null; const el = $('#crop'); if (el) el.hidden = true;
+  if (뒤로 && history.state?.v === '골라') { 골뒤로 = true; history.back(); }
+}
+function 골그리기() {
+  const el = $('#crop'); if (!el || !골) return;
+  const t = 골.틀, b = el.querySelector('.골틀');
+  Object.assign(b.style, { left: t.l + 'px', top: t.t + 'px', width: (t.r - t.l) + 'px', height: (t.b - t.t) + 'px' });
+  const r = 골자름(), 몫 = 골원본크기();
+  el.querySelector('.골치수').textContent = 몫 ? `${Math.round((r.x1 - r.x0) * 몫[0])} × ${Math.round((r.y1 - r.y0) * 몫[1])}` : '';
+  el.querySelector('.골치수').classList.toggle('위', t.t > 96);   // 위에 자리가 있으면 틀 밖 위로 (고른 내용을 안 가리게)
+}
+function 골원본크기() {                                              // 틀 위 치수 — 그림은 원본 화소 · PDF · PPT 는 복사될 화소 · 도면은 화면 화소
+  const 판 = 골.판;
+  if (지금.그림) { const im = $('#pages .pg img'); const 옆 = 지금.돌림 & 1; return im?.naturalWidth ? (옆 ? [im.naturalHeight, im.naturalWidth] : [im.naturalWidth, im.naturalHeight]) : null; }
+  if (지금.쪽수) { const r = 골자름(), 몫 = Math.max(0.25, Math.max(r.x1 - r.x0, r.y1 - r.y0)), pg = $('#pages').children[보는쪽()]; const w = Math.min(2800, Math.max(800, +pg.dataset.pw * 2 / 몫)); return [w, w * 판.height / 판.width]; }
+  return [판.width * (devicePixelRatio || 1), 판.height * (devicePixelRatio || 1)];
+}
+function 골자름() {
+  const p = 골.판, t = 골.틀;
+  return { x0: (t.l - p.left) / p.width, y0: (t.t - p.top) / p.height, x1: (t.r - p.left) / p.width, y1: (t.b - p.top) / p.height };
+}
+function 골손잡이(el) {
+  let 끌 = null;
+  const 붙 = (v, a, b) => Math.min(b, Math.max(a, v));
+  el.addEventListener('pointerdown', e => {
+    if (!골 || e.target.closest('.골바')) return;
+    e.preventDefault();
+    const 한 = 골.한, t = 골.틀, x = 붙(e.clientX, 한.l, 한.r), y = 붙(e.clientY, 한.t, 한.b);
+    const 귀 = e.target.closest('[data-g]')?.dataset.g;
+    if (귀) 끌 = { 꼴: '귀', 귀, t0: { ...t } };
+    else if (e.clientX > t.l && e.clientX < t.r && e.clientY > t.t && e.clientY < t.b && (t.r - t.l) * (t.b - t.t) < 0.95 * (한.r - 한.l) * (한.b - 한.t)) 끌 = { 꼴: '옮김', x, y, t0: { ...t } };   // 거의 전체인 틀(처음)은 안을 끌어도 새로 그림
+    else 끌 = { 꼴: '새', x, y, t0: { ...t } };
+    try { el.setPointerCapture(e.pointerId); } catch (e2) {}
+  });
+  el.addEventListener('pointermove', e => {
+    if (!끌 || !골) return;
+    e.preventDefault();
+    const 한 = 골.한, x = 붙(e.clientX, 한.l, 한.r), y = 붙(e.clientY, 한.t, 한.b), 최소 = 24;
+    const t = { ...끌.t0 };
+    if (끌.꼴 === '귀') {
+      if (끌.귀[0] === 'l') t.l = Math.min(x, t.r - 최소); else t.r = Math.max(x, t.l + 최소);
+      if (끌.귀[1] === 't') t.t = Math.min(y, t.b - 최소); else t.b = Math.max(y, t.t + 최소);
+    } else if (끌.꼴 === '옮김') {
+      const w = t.r - t.l, h = t.b - t.t;
+      t.l = 붙(끌.t0.l + x - 끌.x, 한.l, 한.r - w); t.t = 붙(끌.t0.t + y - 끌.y, 한.t, 한.b - h); t.r = t.l + w; t.b = t.t + h;
+    } else {
+      if (Math.abs(x - 끌.x) < 8 && Math.abs(y - 끌.y) < 8) return;   // 짧은 톡은 틀을 안 바꿈
+      t.l = Math.min(x, 끌.x); t.r = Math.max(x, 끌.x); t.t = Math.min(y, 끌.y); t.b = Math.max(y, 끌.y);
+      if (t.r - t.l < 최소) t.r = Math.min(한.r, t.l + 최소); if (t.b - t.t < 최소) t.b = Math.min(한.b, t.t + 최소);
+    }
+    골.틀 = t; 골그리기();
+  });
+  const 놓기 = () => { 끌 = null; };
+  el.addEventListener('pointerup', 놓기); el.addEventListener('pointercancel', 놓기);
+  el.addEventListener('touchmove', e => e.preventDefault(), { passive: false });   // 뒤 화면이 안 밀리게
+}
+async function 골동작(a) {
+  if (!골) return;
+  if (a === '닫기') return 골닫기();
+  const 자름 = 골자름(), d = 지금.d, 밑 = d.name.replace(/\.[^.]+$/, '') + '_잘라냄', 쪽 = 지금.쪽수 ? `_${보는쪽() + 1}쪽` : '';
+  골닫기();
+  if (a === '복사') return 그림복사(() => 지금그림캔버스(자름));   // 누른 손가락 안에서 바로 (아이폰)
+  if (보내는중) return;
+  보내는중 = true;
+  try {
+    칩(a === '보내기' ? '보낼 그림 만드는 중…' : '새 그림 만드는 중…'); clearTimeout(칩시계);
+    const c = await 지금그림캔버스(자름); if (!c) throw new Error('그림 없음');
+    const 크기 = `${c.width} × ${c.height}`, png = await 보내기.바이트(c, 'image/png'); c.width = c.height = 0;
+    if (a === '보내기') { await 보내기.넘기기(`${밑}${쪽}.png`, 'image/png', png); $('#chip').hidden = true; }
+    else {
+      const id = await 새문서넣기(`${밑}${쪽}.png`, '잘라 냄', png);
+      if (!id) throw new Error('파일을 못 만듦 · 폰 저장 공간 확인');
+      칩(`＋ 새 그림 「${밑}${쪽}」 ${크기} → 목록에 (원본 그대로)`); clearTimeout(칩시계); 칩시계 = setTimeout(() => ($('#chip').hidden = true), 3200);
+    }
+  } catch (e) {
+    $('#chip').hidden = true;
+    알림(`<b>${a === '보내기' ? '보내기' : '새 그림'} 실패</b><div class="sm">${글(e.message || e)}</div>`);
+  } finally { 보내는중 = false; }
+}
 function 표시한쪽들() {
   const s = new Set(Object.keys(지금.표시.쪽).filter(k => k !== 'd'));
   for (const m of 지금.표시.메모 || []) if (m.k !== 'd') s.add(m.k);
@@ -2216,6 +2347,7 @@ function 목록으로() {
 }
 $('#back').addEventListener('click', () => history.state?.v === 'viewer' ? history.back() : 목록으로());
 window.addEventListener('popstate', () => {
+  if (골 || 골뒤로) { 골뒤로 = false; 골닫기(false); return; }   // 골라 복사 틀에서 뒤로 = 틀만 닫음 (0.9.10)
   if (고름) {                                        // 고르기 중 뒤로 = 판 닫기 · 고르기 끝 (10-04)
     if (!$('#sheet').hidden) { 판닫기(); history.pushState({ v: '고르기' }, ''); return; }
     고름 = null; return 목록그리기();
