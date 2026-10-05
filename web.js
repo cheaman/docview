@@ -248,7 +248,22 @@
   };
 
   // ④ 일꾼 · 아이폰 손질 ─────────────────────────────
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn('일꾼 등록 실패', e));
+  if ('serviceWorker' in navigator) {
+    // 새 판 받기 (10-05) — 아이폰 홈 화면 앱은 다른 앱에 갔다 와도 새로 읽지 않아 옛 판에 머묾 (전무님 폰이 10-04 판 그대로였음)
+    //   → 앱이 앞으로 나올 때마다 새 판 확인 · 새 일꾼이 자리 잡으면 목록 화면에서 저절로 새로 엶 (문서를 보는 중이면 목록으로 나올 때)
+    const 처음일꾼 = navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    }).catch(e => console.warn('일꾼 등록 실패', e));
+    let 새판 = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!처음일꾼 || 새판) return;                   // 처음 설치 때는 그대로
+      새판 = true;
+      const 목록인가 = () => !document.getElementById('home')?.hidden;
+      if (목록인가()) return location.reload();
+      const 지켜 = setInterval(() => { if (목록인가()) { clearInterval(지켜); location.reload(); } }, 1000);
+    });
+  }
   document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });   // 사파리가 화면 전체를 키우지 않게
   document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
   addEventListener('DOMContentLoaded', () => {
