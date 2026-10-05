@@ -1,0 +1,473 @@
+/* 문서 보기 — 모양 (2026-10-04 DSM 부품 v1.0 바름 · 목업 1_읽을거리\DSM_목업.html · 처음 승인은 시안 B 종이)
+   색은 :root 색 이름에만 · 어둡게는 폰 설정을 따라 이름만 바꾼다
+   DSM v1.4 (10-06) : 화면 색 밝게 연두 / 어둡게 주황(--accent · 흰 바탕 위 점 · 막대 · 테두리) · 큰 단추 --btn · --on-btn (밝게 짙은 연두 + 흰 / 어둡게 주황 + 검정) · 로고 · 아이콘은 주황 그대로
+   (옛 v1.0 : 대표색 주황 하나(--accent)) · 옅은 바탕 위 주황 글씨는 --accent-ink · 글꼴 프리텐다드(dsm/dsm.css 가 묶은 파일을 부름) · 테두리 띠 없음
+   파일 딱지 색(PDF 빨강 · 한글 파랑 …)은 그대로 (전무님 10-04 「A 색 그대로」) · 펜 · 형광 색도 그대로 */
+
+/* ① 색 이름 */
+:root {
+  --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f2; --text:#1d1d1f; --sub:#6e6e73; --line:#e8e8ed; --rule:#d2d2d7;
+  --accent:#568800; --on-accent:#ffffff; --accent-soft:#eef7dc; --accent-ink:#3d6400; --btn:#3f7300; --on-btn:#ffffff; --bar:#f5f5f7; --bar-text:#1d1d1f; --faint:#aeaeb2;
+  --page:#ffffff; --page-text:#1d1d1f; --reader:#ebebef;
+  --shadow:0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.06);
+  --radius:14px; --font:"Pretendard","Pretendard Variable","Malgun Gothic","맑은 고딕",system-ui,sans-serif; --read-font:var(--font);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#000000; --surface:#1c1c1e; --surface2:#2c2c2e; --text:#f5f5f7; --sub:#a1a1a6; --line:#38383a; --rule:#48484a;
+    --accent:#e8743b; --on-accent:#ffffff; --accent-soft:#3a2a20; --accent-ink:#f0955f; --btn:#e8743b; --on-btn:#0b0b0c; --bar:#000000; --bar-text:#f5f5f7; --faint:#636366;
+    --page:#1c1c1e; --page-text:#e5e5ea; --reader:#000000; --shadow:0 0 0 1px #2c2c2e;
+    color-scheme:dark;
+  }
+}
+
+/* ② 모양 */
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; height:100%; }
+body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:15px; line-height:1.5; overflow:hidden; }
+button { font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+.ico { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+.view { position:fixed; inset:0; display:flex; flex-direction:column; }
+[hidden] { display:none !important; }
+
+.bar { flex:none; display:flex; align-items:center; gap:8px; min-height:56px; padding:8px 12px; background:var(--bar); color:var(--bar-text); }
+.bar h1 { margin:0 4px; font-size:21px; flex:1; }
+.tovideo { flex:none; text-decoration:none; background:var(--surface2); color:var(--sub); border-radius:999px; padding:8px 14px; font-weight:700; font-size:14px; }   /* 10-04 · 36번 영상 → 클로드 */
+.bar .t { flex:1; min-width:0; }
+.bar .n { font-weight:700; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bar .s { font-size:13px; color:var(--sub); }
+.ib { width:42px; height:42px; border-radius:50%; display:grid; place-items:center; flex:none; }
+.ib:active { background:var(--surface2); }
+
+/* 최근 목록 */
+.list { flex:1; overflow-y:auto; padding:6px 12px 96px; -webkit-overflow-scrolling:touch; }
+.sec { font-size:13px; color:var(--sub); margin:12px 6px 6px; }
+.item { display:flex; gap:12px; align-items:center; width:100%; text-align:left; background:var(--surface); border-radius:var(--radius); padding:12px; margin-bottom:8px; box-shadow:var(--shadow); }
+.item:active { background:var(--surface2); }
+.badge { width:46px; height:50px; border-radius:8px; display:grid; place-items:center; font-size:13px; font-weight:800; color:#fff; flex:none; letter-spacing:-.4px; }
+.b-pdf { background:#d9473f; } .b-hwp, .b-hwpx { background:#2b7bd6; } .b-doc, .b-docx { background:#2f4f9e; } .b-txt { background:#6b7480; } .b-img { background:#8e44ad; } .b-cad { background:#16a085; } .b-xls { background:#1d6f42; } .b-etc { background:#8a7f70; }
+.item .t { flex:1; min-width:0; }
+.item .n { font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.item .s { font-size:13px; color:var(--sub); }
+.item .more { width:40px; height:40px; display:grid; place-items:center; color:var(--sub); border-radius:50%; }
+.fab { position:fixed; right:16px; bottom:calc(20px + env(safe-area-inset-bottom)); display:flex; align-items:center; gap:6px; background:var(--btn); color:var(--on-btn); border-radius:999px; padding:13px 20px; font-weight:700; font-size:15px; box-shadow:0 6px 16px rgba(0,0,0,.2); }
+.fab .ico { stroke:var(--on-btn); }
+
+.empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:26px; gap:12px; color:var(--sub); }
+.empty .big { width:84px; height:84px; border-radius:24px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; }
+.empty .big .ico { width:42px; height:42px; }
+.empty h2 { margin:0; color:var(--text); font-size:18px; }
+.how { text-align:left; background:var(--surface); border-radius:var(--radius); padding:12px 14px; box-shadow:var(--shadow); color:var(--text); font-size:14px; width:100%; max-width:420px; }
+.how div + div { margin-top:8px; }
+.pill { display:inline-block; background:var(--surface2); border-radius:6px; padding:0 6px; }
+
+/* 보기 */
+.reader { flex:1; overflow:auto; background:var(--reader); -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y; }
+.pages { padding:10px; display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; }
+.pg { width:100%; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.18); border-radius:2px; position:relative; overflow:hidden; }
+.pg img { display:block; width:100%; height:100%; }
+.pg .no { position:absolute; inset:0; display:grid; place-items:center; color:#9aa4b2; font-size:14px; }
+@media (prefers-color-scheme: dark) { .pg img { filter:brightness(.88); } }
+.chip { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(84px + env(safe-area-inset-bottom)); background:rgba(20,22,26,.78); color:#fff; font-size:13px; padding:5px 12px; border-radius:999px; pointer-events:none; }
+.tools { flex:none; display:flex; justify-content:space-around; align-items:center; padding:6px 6px calc(10px + env(safe-area-inset-bottom)); background:var(--bar); color:var(--bar-text); border-top:1px solid var(--line); }
+.tool { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:13px; min-width:64px; padding:6px 4px; border-radius:12px; }
+.tool:active { background:var(--accent-soft); color:var(--accent-ink); }
+
+.note { margin:10px 12px 0; display:flex; gap:10px; align-items:flex-start; background:var(--accent-soft); color:var(--text); border-radius:14px; padding:12px 14px; font-size:14px; }
+.note b { color:var(--accent-ink); }
+.note .sm { color:var(--sub); font-size:13px; word-break:break-all; }
+
+/* 아래 판 */
+.dim { position:fixed; inset:0; background:rgba(0,0,0,.35); }
+.sheet { position:fixed; left:0; right:0; bottom:0; background:var(--surface); border-radius:22px 22px 0 0; box-shadow:0 -6px 24px rgba(0,0,0,.18); padding:10px 18px calc(18px + env(safe-area-inset-bottom)); }
+.sheet .grab { width:40px; height:4px; border-radius:2px; background:var(--line); margin:0 auto 12px; }
+.sheet h3 { margin:0 0 10px; font-size:16px; }
+.sheet .row { display:flex; gap:10px; align-items:center; }
+.sheet input { flex:1; font:inherit; font-size:18px; padding:10px 14px; border-radius:12px; border:1px solid var(--line); background:var(--surface2); color:var(--text); }
+.btn { padding:11px 18px; border-radius:12px; background:var(--btn); color:var(--on-btn); font-weight:700; }
+.btn.plain { background:var(--surface2); color:var(--text); }
+.act { display:block; width:100%; text-align:left; padding:14px 6px; font-size:16px; border-bottom:1px solid var(--line); }
+.act:last-child { border-bottom:0; }
+.act.warn { color:#c0392b; }
+
+/* ── 3단계 : 글 문서 (TXT · 워드 · 한글) ── 글씨 크기는 .flowin 의 font-size 하나로 */
+.flow { flex:1; overflow:auto; background:var(--page); color:var(--page-text); -webkit-overflow-scrolling:touch; }
+.flowin { padding:18px 18px 40px; font-family:var(--read-font); font-size:17px; line-height:1.7; word-break:keep-all; overflow-wrap:anywhere; }
+.flowin.바탕-종이 { background:#fffdf8; color:#2b2620; }
+.flow:has(.바탕-종이) { background:#fffdf8; }
+.flowin.바탕-어둡게 { background:#14171c; color:#e2e6ec; }
+.flow:has(.바탕-어둡게) { background:#14171c; }
+.flowin.글꼴-명조 { font-family:'Noto Serif CJK KR', 'Noto Serif KR', serif; }
+.flowin p { margin:0 0 .45em; min-height:1em; }
+.flowin p.빈줄 { min-height:.6em; margin:0; }
+.flowin h2, .flowin h3, .flowin h4, .flowin h5, .flowin h6, .flowin h7 { font-family:var(--font); margin:.8em 0 .4em; line-height:1.35; }
+.flowin .표틀 { overflow-x:auto; margin:.4em 0 .9em; }
+.flowin table { border-collapse:collapse; font-size:.86em; line-height:1.45; min-width:60%; }
+.flowin td { border:1px solid var(--rule); padding:.35em .5em; vertical-align:top; min-width:3.6em; }
+.flowin td p { margin:0; }
+.flowin .그림 { max-width:100%; height:auto; display:inline-block; vertical-align:middle; }
+.flowin .빈그림 { color:var(--sub); font-size:.85em; }
+.flowin .그림틀 { text-align:center; margin:.4em 0; }   /* 옛 한글 — 글자처럼 취급 안 한 그림 · 묶음 (10-05) */
+.flowin .그림.채우는중 { background:var(--rule); min-width:3em; min-height:2em; }   /* 뒤에서 꺼내는 중인 그림 자리 */
+.flowin .탭 { display:inline-block; min-width:2em; }
+.flowin .글머리 { color:var(--accent-ink); }
+.flowin .글상자 { border:1px dashed var(--rule); border-radius:6px; padding:.5em .7em; margin:.4em 0; }
+.flowin .쪽나눔 { border:0; border-top:1px dashed var(--rule); margin:1.2em 0; }
+.flowin .형광 { background:#fff3a0; color:#191f28; }
+.flowin .txt, .flowin .글자만 { white-space:pre-wrap; font-family:var(--read-font); }
+mark { background:#ffe26a; color:#1b1f24; border-radius:3px; padding:0 1px; }
+mark.cur { background:#ff9f2e; }
+
+/* 찾기 막대 */
+.findbar { gap:4px; padding:6px 6px; }
+.field { flex:1; min-width:0; display:flex; align-items:center; gap:6px; background:var(--surface2); color:var(--text); border-radius:999px; padding:4px 12px; }
+.field .ico { width:18px; height:18px; opacity:.6; }
+.field input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--text); font:inherit; font-size:16px; padding:5px 0; }
+.cnt { font-size:13px; color:var(--sub); white-space:nowrap; min-width:3.2em; text-align:center; }
+
+/* 글씨 판 */
+.sheet .opt { display:flex; align-items:center; gap:12px; margin:10px 0; }
+.sheet .lab { width:64px; font-size:14px; color:var(--sub); flex:none; }
+.step { flex:1; display:flex; align-items:center; justify-content:space-between; background:var(--surface2); border-radius:999px; padding:4px; }
+.step button { width:52px; height:38px; border-radius:999px; background:var(--surface); font-weight:800; box-shadow:var(--shadow); }
+.step .v { font-weight:700; }
+.seg { flex:1; display:flex; background:var(--surface2); border-radius:999px; padding:4px; gap:4px; }
+.seg button { flex:1; padding:8px 0; border-radius:999px; font-size:14px; }
+.seg button.on { background:var(--surface); box-shadow:var(--shadow); font-weight:700; color:var(--accent-ink); }
+.tool.on { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; }
+
+/* ── 화면 크기 (2026-10-03 · 폴드 접음 344px ~ 펼침 880px · 태블릿) ──
+   글 문서 한 줄은 46em 까지만 (펼친 폴드에서 줄이 너무 길어지지 않게) · 목록 · 판은 가운데로 */
+.flowin { max-width:46em; margin:0 auto; }
+.list > * { max-width:720px; margin-left:auto; margin-right:auto; }
+.sheet { max-width:560px; margin:0 auto; }
+.note { max-width:46em; }
+@media (min-width:600px) { .note { margin-left:auto; margin-right:auto; width:calc(100% - 24px); } }
+@media (max-width:359px) {           /* 접은 폴드 바깥 화면 · 작은 폰 */
+  .bar { padding:6px 6px; gap:4px; }
+  .flowin { padding:14px 12px 36px; }
+  .tool { min-width:52px; font-size:13px; }
+  .findbar .ib { width:36px; height:36px; }
+  .item { gap:10px; padding:10px; }
+  .badge { width:40px; height:46px; }
+}
+.flowin p.표줄 { font-family:var(--font); font-size:.9em; border-bottom:1px dotted var(--rule); padding:.15em 0; margin:0; }
+
+/* 그림 — 흰 바탕 대신 투명 · 체크 무늬 없이 */
+.pg.그림쪽 { background:transparent; box-shadow:none; }
+
+/* 도면 (DXF) — 캔버스 하나 · 손가락은 dxf.js 가 받음 */
+.cadbox { flex:1; position:relative; overflow:hidden; background:#111418; }
+.cadbox canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.층줄 { display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); font-size:15px; }
+.층줄 input { width:20px; height:20px; accent-color:var(--accent); }
+.층줄 .칩 { width:14px; height:14px; border-radius:4px; flex:none; border:1px solid var(--line); }
+.층줄 .수 { margin-left:auto; color:var(--sub); font-size:13px; }
+.층목록 { max-height:55vh; overflow:auto; margin:6px 0 10px; }
+.층단추 { display:flex; gap:8px; }
+
+/* 엑셀 — 시트 탭 · 열 이름 · 행 번호 (엑셀처럼) */
+.flowin .엑셀 { font-family:var(--font); }
+.시트탭 { display:flex; gap:6px; overflow-x:auto; padding:0 0 10px; position:sticky; top:-18px; background:inherit; z-index:2; }
+.시트탭 button { flex:none; padding:6px 12px; border-radius:999px; background:rgba(127,127,127,.16); color:inherit; font-size:14px; white-space:nowrap; }
+.시트탭 button.on { background:var(--btn); color:var(--on-btn); font-weight:700; }
+.flowin table.시트 { font-size:.82em; border-collapse:collapse; min-width:0; }
+.flowin table.시트 th { background:rgba(127,127,127,.16); color:inherit; opacity:.75; font-weight:600; font-size:.85em; padding:.2em .5em; border:1px solid var(--rule); }
+.flowin table.시트 tr > th:first-child { text-align:right; white-space:nowrap; min-width:2.4em; }
+.flowin table.시트 td { min-width:5em; white-space:pre-wrap; max-width:22em; overflow-wrap:normal; word-break:keep-all; }
+.flowin table.시트 td.수 { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.시트알림 { color:var(--sub); font-size:13px; }
+
+/* ── v0.6 (2026-10-03) : 돌리기 · 쪽지 · 펜 ──
+   쪽 틀(.pg) 안의 .속 = 그림 + 펜 표시(svg). 돌리면 .pg 비율이 뒤집히고 .속 이 가운데에서 돔 (app.js 쪽모양) */
+.pg .속 { position:absolute; left:50%; top:50%; width:100%; height:100%; transform:translate(-50%,-50%); }
+.pg .속 img { display:block; width:100%; height:100%; }
+.pg svg.mk { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+@media (prefers-color-scheme: dark) { .pg svg.mk { filter:brightness(1.1); } }
+
+/* 문서 쪽지 — 노란 쪽지 한 장 */
+:root { --memo-bg:#fff4c2; --memo-text:#3d3200; --memo-line:#f0dc85; }
+@media (prefers-color-scheme: dark) { :root { --memo-bg:#3a3418; --memo-text:#f2e6b3; --memo-line:#57502a; } }
+.memobox { flex:none; display:flex; align-items:flex-start; gap:4px; margin:8px 12px 0; background:var(--memo-bg); color:var(--memo-text); border:1px solid var(--memo-line); border-radius:12px; padding:8px 4px 8px 12px; font-size:14px; line-height:1.5; }
+.memobox .mt { flex:1; min-width:0; white-space:pre-wrap; word-break:keep-all; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; padding-top:3px; }
+.memobox .mt::before { content:'📝 '; }
+.memobox .ib { width:32px; height:32px; }
+.memobox .ib .ico { width:18px; height:18px; }
+@media (min-width:600px) { .memobox { max-width:46em; margin-left:auto; margin-right:auto; width:calc(100% - 24px); } }
+.memo-b { color:var(--sub); }
+.memo-b.있음 { color:#c79a00; }
+.memo-b.있음 .ico { fill:var(--memo-bg); }
+.item .memo { font-size:13px; color:var(--memo-text); background:var(--memo-bg); border-radius:6px; padding:1px 7px; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; width:fit-content; }
+.sheet textarea { width:100%; font:inherit; font-size:16px; line-height:1.6; padding:10px 12px; border-radius:12px; border:1px solid var(--memo-line); background:var(--memo-bg); color:var(--memo-text); resize:vertical; min-height:7.5em; max-height:45vh; }
+.sheet .끝줄 { margin-top:10px; }
+.btn.warn { color:#c0392b; }
+
+/* 펜 판 — 도구 줄 바로 위 */
+.penbar { flex:none; display:flex; align-items:center; gap:4px; padding:6px 8px; background:var(--bar); border-top:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+.penbar::-webkit-scrollbar { display:none; }
+.chip { white-space:nowrap; }
+body:has(#viewer:not([hidden]) #penbar:not([hidden])) .chip { bottom:calc(140px + env(safe-area-inset-bottom)); }   /* 칩이 body 로 나감 (0.9.3) */
+body:has(#viewer:not([hidden]) #shapebar:not([hidden])) .chip, body:has(#viewer:not([hidden]) #stampbar:not([hidden])) .chip { bottom:calc(206px + env(safe-area-inset-bottom)); }
+.penbar .펜색 { width:38px; height:38px; border-radius:50%; display:grid; place-items:center; flex:none; }
+.penbar .펜색 i { width:24px; height:24px; border-radius:50%; display:block; box-shadow:inset 0 0 0 2px rgba(0,0,0,.12); }
+.penbar .펜색.on { background:var(--accent-soft); box-shadow:inset 0 0 0 2px var(--accent); }
+.penbar .갈피 { width:1px; height:26px; background:var(--line); margin:0 2px; flex:none; }
+.penbar .pb { display:flex; align-items:center; gap:4px; font-size:13px; padding:8px 9px; border-radius:999px; white-space:nowrap; flex:none; color:var(--bar-text); }
+.penbar .pb .ico { width:18px; height:18px; }
+.penbar .pb.on { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; }
+.penbar .pb:disabled { opacity:.35; }
+#penoff { margin-left:auto; }
+@media (max-width:359px) { .penbar { gap:2px; padding:6px 4px; } .penbar .pb { padding:8px 6px; } .penbar .펜색 { width:36px; height:36px; } }
+
+/* HTML (v0.6) — 걸러 옮긴 꼴만 · 링크는 눌리지 않음(밖으로 안 나감) */
+.b-html { background:#e8710a; }
+.flowin .html문서 pre { white-space:pre-wrap; font-size:.9em; background:rgba(127,127,127,.1); padding:.6em .8em; border-radius:6px; }
+.flowin .html문서 blockquote { margin:.4em 0; padding-left:.9em; border-left:3px solid var(--rule); }
+.flowin .html문서 .html링크 { color:var(--accent-ink); text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--accent-ink) 45%, transparent); }
+.flowin .html문서 ul, .flowin .html문서 ol { padding-left:1.4em; margin:.3em 0 .6em; }
+.flowin .html문서 hr { border:0; border-top:1px solid var(--rule); margin:1em 0; }
+.flowin .html문서 img.그림 { max-width:100%; height:auto; }
+.flowin .html문서 div { min-height:0; }
+
+/* ── v0.7 (2026-10-03) : 쪽 목록 · PDF 찾기 · 재기 · 보내기 ── */
+.thumbs { background:var(--reader); z-index:5; }
+.thumbs .bar { gap:6px; }
+.쪽칸 { flex:0 1 92px; padding:2px 10px; }
+.쪽칸 input { font-size:15px; padding:6px 0; width:100%; }
+.thumbs .btn { padding:9px 14px; flex:none; }
+.tgrid { flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:12px 10px; padding:14px 14px calc(24px + env(safe-area-inset-bottom)); align-content:start; }
+.썸 { display:flex; flex-direction:column; align-items:center; gap:5px; min-width:0; }
+.썸틀 { width:100%; position:relative; overflow:hidden; background:#fff; border-radius:3px; box-shadow:0 1px 4px rgba(0,0,0,.2); }
+.썸틀 .속 { position:absolute; left:50%; top:50%; width:100%; height:100%; transform:translate(-50%,-50%); }
+.썸틀 img { display:block; width:100%; height:100%; }
+.썸.지금 .썸틀 { box-shadow:0 0 0 3px var(--accent); }
+.썸번호 { font-size:13px; color:var(--sub); }
+.썸.지금 .썸번호 { color:var(--accent-ink); font-weight:700; }
+.썸번호 i { font-style:normal; color:#e5383b; }
+@media (prefers-color-scheme: dark) { .썸틀 img { filter:brightness(.88); } }
+.pg .찾은칸 { position:absolute; background:rgba(255,214,0,.42); mix-blend-mode:multiply; border-radius:2px; pointer-events:none; }
+.pg .찾은칸.cur { background:rgba(255,140,0,.55); box-shadow:0 0 0 2px rgba(255,120,0,.85); }
+.measbar { gap:6px; }
+.measbar .재기글 { flex:1; min-width:0; word-break:keep-all; font-size:13px; line-height:1.35; color:var(--bar-text); padding:2px 4px; }
+.measbar .재기글 b { color:#0090c9; font-size:14px; }
+@media (prefers-color-scheme: dark) { .measbar .재기글 b { color:#7fd6ff; } }
+.measbar .흐림 { color:var(--sub); }
+#measoff { margin-left:0; }
+.판설명 { font-size:13px; color:var(--sub); padding:10px 6px 0; }
+.tools .tool { flex:1 1 0; min-width:0; max-width:96px; white-space:nowrap; }
+
+/* ── v0.7.1 (2026-10-03) : 형광펜 따로 · 색 여럿 ──
+   형광은 svg.hl 한 장에 불투명으로 칠하고 그 장 전체를 곱하기(multiply) · 80% 로 섞음
+   → 겹쳐 칠해도 안 진해지고, 검은 글자는 검게 남음(또렷). 펜(svg.mk)은 그 위 */
+.pg svg.hl { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; mix-blend-mode:multiply; opacity:.8; }
+.펜종류 { display:flex; flex:none; background:var(--surface2); border-radius:999px; padding:3px; gap:2px; }
+.펜종류 button { padding:7px 12px; border-radius:999px; font-size:14px; color:var(--sub); }
+.펜종류 button.on { background:var(--surface); color:var(--accent-ink); font-weight:700; box-shadow:var(--shadow); }
+.펜지금 { display:flex; align-items:center; gap:2px; flex:none; padding:4px 4px 4px 6px; border-radius:999px; color:var(--sub); }
+.펜지금 i, .penpal .펜색 i { width:26px; height:26px; border-radius:50%; display:block; box-shadow:inset 0 0 0 2px rgba(0,0,0,.14); }
+.펜지금 .ico { width:16px; height:16px; }
+.펜지금.꺼짐 i { opacity:.35; }
+i.형광점 { border-radius:7px !important; }
+.penpal { flex:none; display:flex; gap:4px; padding:8px 8px 4px; background:var(--bar); border-top:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+.penpal::-webkit-scrollbar { display:none; }
+.penpal .펜색 { flex:none; width:auto; height:auto; min-width:44px; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 2px; border-radius:12px; }
+.penpal .펜색 span { font-size:13px; color:var(--sub); }
+.penpal .펜색.on { background:var(--accent-soft); box-shadow:none; }
+.penpal .펜색.on span { color:var(--accent-ink); font-weight:700; }
+@media (max-width:420px) {                    /* 접은 폰 · 작은 폰 — 지우개 · 되돌리기는 그림만 */
+  #eraser, #undo { font-size:0; gap:0; padding:8px; }
+  #eraser .ico, #undo .ico { width:20px; height:20px; }
+}
+
+/* 위치 메모 (v0.7.1) — 쪽 틀(.pg)을 너비 기준 그릇으로 → 메모 너비 · 글씨는 cqw (쪽과 같이 커짐) */
+.pg { container-type:inline-size; }
+.메모층 { position:absolute; inset:0; pointer-events:none; z-index:2; }
+.cadnotes { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.메모쪽 { position:absolute; pointer-events:auto; background:rgba(255,244,194,.96); color:#3d3200; border:1px solid #e0bf3e; border-radius:.35em; padding:.45em .55em; line-height:1.4; box-shadow:0 2px 8px rgba(0,0,0,.2); font-family:var(--font); }
+.메모쪽 .메모글 { white-space:pre-wrap; word-break:keep-all; overflow-wrap:anywhere; }
+.메모손잡이 { display:none; position:absolute; right:-11px; bottom:-11px; width:24px; height:24px; border-radius:50%; background:var(--accent); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.3); }
+#viewer:has(#penbar.메모중:not([hidden])) .메모손잡이 { display:block; }
+#viewer:has(#penbar.메모중:not([hidden])) .메모쪽 { outline:2px dashed rgba(43,107,255,.55); outline-offset:2px; }
+.메모핀 { position:absolute; transform:translate(-50%,-50%); pointer-events:auto; }
+.메모핀 .핀 { width:32px; height:32px; border-radius:50%; background:#ffd43b; border:2px solid #fff; display:grid; place-items:center; font-size:16px; box-shadow:0 2px 6px rgba(0,0,0,.3); }
+.메모핀 .메모말 { display:none; position:absolute; left:50%; top:calc(100% + 6px); transform:translateX(-50%); width:max-content; max-width:min(70vw, 320px); background:rgba(255,244,194,.98); color:#3d3200; border:1px solid #e0bf3e; border-radius:8px; padding:.45em .6em; white-space:pre-wrap; word-break:keep-all; line-height:1.4; box-shadow:0 2px 8px rgba(0,0,0,.2); }
+.메모핀.펼침 .메모말 { display:block; }
+.penbar.메모중 #pencolor, .penbar.메모중 #eraser, .penbar.메모중 #undo, .penbar.메모중 .갈피 { display:none; }
+.펜종류 button { padding:7px 11px; }
+
+/* 아이폰 웹앱 (web.js) — 사파리에서 처음 열었을 때 「홈 화면에 추가」 안내 띠 */
+.홈안내 { display:flex; align-items:center; gap:6px; margin:8px 12px 0; padding:10px 6px 10px 14px; border-radius:14px; background:var(--accent-soft); font-size:14px; line-height:1.5; }
+.홈안내 b { color:var(--accent-ink); }
+.홈안내 .ib { margin-left:auto; width:34px; height:34px; font-size:20px; color:var(--sub); }
+
+/* ZIP 보기 (10-04 · zipview.js) — 첫 화면 목록과 같은 줄 모양 · 위에 길(폴더) · 요약 · 갤럭시는 「모두 풀어 저장」 */
+.b-zip { background:#b7791f; } .b-dir { background:#e3a72f; font-size:22px; }
+.zipbox { padding-top:8px; }
+.zip길 { display:flex; flex-wrap:wrap; align-items:center; gap:2px 4px; margin:2px 4px 6px; font-size:15px; }
+.zip길 button { padding:6px 8px; border-radius:10px; background:var(--surface2); color:var(--text); font-size:15px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.zip길 button.지금 { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; }
+.zip길 .사이 { color:var(--sub); }
+.zip요약 { font-size:13px; color:var(--sub); margin:0 6px 10px; }
+.zip모두 { display:block; width:100%; margin:0 0 12px; padding:13px 14px; border-radius:var(--radius); background:var(--btn); color:var(--on-btn); font-weight:700; font-size:15px; text-align:center; }
+.zipbox .item .s .자물쇠 { color:#c0392b; }
+
+/* PPT 보기 (10-04 · ppt.js) — 목록 딱지 · 「글로」 의 장 머리 · 발표자 메모 */
+.b-ppt { background:#d35400; }
+.flowin .ppt장머리 { display:inline-block; margin:1.4em 0 .3em; padding:1px 10px; border-radius:10px; background:#d35400; color:#fff; font-family:var(--font); font-size:13px; font-weight:700; }
+.flowin .ppt글 > .ppt장머리:first-child { margin-top:0; }
+.flowin .ppt글 h4 { font-size:1.15em; }
+.flowin .ppt메모 { margin:.5em 0 .8em; padding:.45em .8em; border-left:3px solid #d35400; background:rgba(211,84,0,.07); font-size:.88em; white-space:pre-wrap; }
+
+/* ── DSM (10-04 · 목업 DSM_목업.html) ── 머리 글자표 · 목록 묶음(카드 하나 + 가는 줄) · 넓은 큰 단추 하나 · 서명 줄 */
+.bar h1 { letter-spacing:-.02em; }
+.bar .dsm-mark { --s:30px; margin-left:4px; }
+.list { padding:4px 14px 132px; }
+.sec { font-weight:600; margin:14px 4px 6px; }
+.묶음 { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); padding:0 12px; }
+.묶음 .item { background:none; box-shadow:none; border-radius:0; margin:0; padding:11px 0; border-bottom:1px solid var(--line); }
+.묶음 .item:last-child { border-bottom:0; }
+.묶음 .item:active { background:none; opacity:.55; }
+.badge { width:42px; height:46px; border-radius:9px; font-size:12px; }
+.item .more { color:var(--faint); }
+.fab { left:16px; right:16px; bottom:calc(38px + env(safe-area-inset-bottom)); justify-content:center; border-radius:var(--radius); padding:14px; box-shadow:none; }
+.서명 { position:fixed; left:0; right:0; bottom:calc(10px + env(safe-area-inset-bottom)); text-align:center; font-size:13px; color:var(--faint); pointer-events:none; }
+.empty { padding-bottom:120px; }
+.tools { border-top:0; box-shadow:0 -1px 0 var(--line); background:var(--surface); }
+.zipbox .item { background:var(--surface); }
+/* 아래 큰 단추 · 서명 줄 뒤 — 목록이 비치지 않게 바탕색으로 덮음 (10-04 실측) */
+#home::after { content:''; position:fixed; left:0; right:0; bottom:0; height:calc(124px + env(safe-area-inset-bottom)); background:linear-gradient(to bottom, transparent, var(--bg) 38%); pointer-events:none; z-index:1; }
+.fab, .서명 { z-index:2; }
+
+/* 10-04 · 목업 넷 (복사_목업.html) — 형식 · 묶음 칩 줄 · 고르기 · 아래 두 단추 · 권함 카드 */
+.칩줄 { flex:none; display:flex; gap:6px; align-items:center; overflow-x:auto; padding:0 14px 8px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.칩줄::-webkit-scrollbar { display:none; }
+.칩줄 .칩 { flex:none; padding:6px 12px; border-radius:999px; background:var(--surface2); color:var(--sub); font-size:13px; font-weight:600; white-space:nowrap; }
+.칩줄 .칩 i { font-style:normal; opacity:.75; margin-left:2px; }
+.칩줄 .칩.on { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; }
+.나눔 { flex:none; display:flex; background:var(--surface2); border-radius:10px; padding:2px; }
+.나눔 button { padding:5px 10px; border-radius:8px; font-size:13px; font-weight:600; color:var(--sub); }
+.나눔 button.on { background:var(--surface); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+#homebar .tovideo, #selbar .tovideo { padding:8px 12px; font-size:13px; }
+#selbar h1 { font-size:18px; }
+.sec { display:flex; align-items:center; }
+.sec span { flex:1; }
+.모두칸 { font-size:13px; font-weight:600; color:var(--sub); padding:2px 6px; }
+.모두칸.on { color:var(--accent-ink); font-weight:700; }
+.고름칸 { width:24px; height:24px; border-radius:50%; border:2px solid var(--faint); flex:none; display:grid; place-items:center; font-size:13px; color:transparent; }
+.고름칸.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.selfoot { position:fixed; left:16px; right:16px; bottom:calc(38px + env(safe-area-inset-bottom)); display:flex; gap:8px; z-index:2; }
+.selfoot button { flex:1; padding:14px; border-radius:var(--radius); font-weight:700; font-size:15px; background:var(--surface2); color:var(--text); }
+.selfoot button:disabled { opacity:.45; }
+.selfoot .지움, .btn.지움 { background:#d70015; color:#fff; }
+@media (prefers-color-scheme: dark) { .selfoot .지움, .btn.지움 { background:#ff453a; } }
+.권함 { background:var(--accent-soft); border-radius:var(--radius); padding:11px 13px; font-size:14px; margin:4px 0 10px; }
+.권함 b { color:var(--accent-ink); }
+.권함단추 { display:flex; gap:6px; margin-top:8px; }
+.권함단추 .칩 { padding:6px 12px; border-radius:999px; font-size:13px; font-weight:600; background:var(--surface); color:var(--sub); }
+.권함단추 .칩.on { color:var(--accent-ink); font-weight:700; }
+.빈칸글 { text-align:center; color:var(--sub); font-size:14px; padding:30px 0; }
+.흐림 { color:var(--sub); font-weight:400; }
+
+/* ── 0.9.3 (10-05 · 목업 1_읽을거리\여덟가지_목업.html 승인) — ② 직전 자리 · ⑭ 즐겨찾기 · 책갈피 ── */
+.item .s .자리 { color:var(--accent-ink); font-weight:700; }
+.자리막대 { height:3px; border-radius:2px; background:var(--line); margin-top:5px; overflow:hidden; }
+.자리막대 i { display:block; height:100%; background:var(--accent); border-radius:2px; }
+.sec.즐겨머리 span { color:var(--accent-ink); }
+.묶음.즐겨칸 { box-shadow:0 0 0 2px var(--accent-soft), var(--shadow); }
+.selfoot button { padding:14px 6px; white-space:nowrap; }
+.chip { z-index:6; }
+.bmk-b { color:var(--sub); }
+.bmk-b.on { color:var(--accent); }
+.bmk-b.on .ico { fill:var(--accent); }
+.이어봄 { position:fixed; left:50%; transform:translateX(-50%); bottom:calc(124px + env(safe-area-inset-bottom)); display:flex; align-items:center; gap:10px; background:rgba(20,22,26,.86); color:#fff; font-size:13px; padding:6px 6px 6px 14px; border-radius:999px; white-space:nowrap; z-index:6; }
+.이어봄 button { color:#ffd27a; font-weight:700; font-size:13px; padding:5px 10px; border-radius:999px; }
+.이어봄 button:active { background:rgba(255,255,255,.12); }
+.thumbs #tkinds { padding-top:2px; }
+.썸번호 .책 { color:var(--accent); }
+
+/* ── 0.9.4 ⑬ 펜 도형 — 펜 판 「도형」 → 위에 작은 줄 (화살표 · 네모 · 동그라미 · 글) ── */
+.shapebar { flex:none; display:flex; gap:6px; justify-content:center; padding:8px 8px 4px; background:var(--bar); border-top:1px solid var(--line); }
+.shapebar button { display:flex; flex-direction:column; align-items:center; gap:2px; min-width:62px; padding:6px 4px; border-radius:12px; font-size:13px; color:var(--bar-text); }
+.shapebar button .ico { width:22px; height:22px; }
+.shapebar button.on { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; box-shadow:inset 0 0 0 2px var(--accent); }
+.pages { margin:0 auto; }   /* 1배 아래로 줄이면 가운데 (10-05) */
+.고름칸 { position:relative; }
+.고름칸::before { content:''; position:absolute; inset:-14px -12px; }   /* 문질러 고르기 — 동그라미 손가락 자리를 넓게 (10-05) */
+
+/* ── 0.9.6 ③ 전체 찾기 — 첫 화면 ⌕ · 이름에서 · 문서 속에서 ── */
+.찾기단추 { display:grid; place-items:center; padding:7px 10px !important; }
+.찾기단추 .ico { width:18px; height:18px; }
+.item .n mark, .찾은줄 mark { background:#ffe066; color:#1d1d1f; border-radius:3px; padding:0 1px; }
+.찾은줄 { font-size:13px; color:var(--sub); line-height:1.55; margin-top:5px; padding:4px 8px; border-radius:8px; background:var(--surface2); word-break:break-all; }
+.찾은줄:active { background:var(--accent-soft); }
+.찾은줄 .쪽번 { font-size:12px; font-weight:700; color:var(--accent-ink); margin-left:6px; white-space:nowrap; }
+.찾은덧 { font-size:12px; color:var(--faint); margin-top:4px; }
+.찾기준비 { font-size:13px; color:var(--sub); text-align:center; padding:12px 0 4px; }
+.item:has(.찾은줄) { align-items:flex-start; }
+
+/* ── 0.9.6 ④ 사진 여러 장 → PDF 한 권 ── */
+.selfoot .새것 { background:var(--btn); color:var(--on-btn); }
+.pdf썸들 { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin:4px 0 6px; max-height:38vh; overflow-y:auto; }
+.pdf썸 { position:relative; aspect-ratio:3/4; border-radius:8px; overflow:hidden; background:var(--surface2); touch-action:none; user-select:none; -webkit-user-select:none; }
+.pdf썸 img { width:100%; height:100%; object-fit:cover; pointer-events:none; -webkit-user-drag:none; }
+.pdf썸 b { position:absolute; left:4px; top:4px; min-width:20px; height:20px; padding:0 5px; border-radius:10px; background:var(--accent); color:#fff; font-size:12px; display:grid; place-items:center; }
+.pdf썸.끄는중 { outline:3px solid var(--accent); transform:scale(1.05); z-index:1; box-shadow:0 6px 16px rgba(0,0,0,.25); }
+
+/* ── 0.9.6 ⑫ 검토 도장 · 손 서명 ── */
+.도장줄 { justify-content:flex-start; overflow-x:auto; scrollbar-width:none; padding:8px 10px 4px; }
+.도장줄::-webkit-scrollbar { display:none; }
+.도장줄 button { flex:none; min-width:0; padding:8px 12px; flex-direction:row; font-weight:700; }
+.도장줄 .도장꼴 { color:#d6262b; border:2px solid #d6262b; border-radius:6px; padding:2px 7px; font-size:13px; background:rgba(255,255,255,.5); }
+.도장줄 .서명꼴 { font-style:italic; font-family:cursive, serif; font-size:15px; }
+.서명판 { width:100%; aspect-ratio:5/2; border-radius:12px; background:#fff; border:1px dashed var(--faint); touch-action:none; display:block; }
+.도장목록 { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+.도장목록 span { display:inline-flex; align-items:center; gap:4px; color:#d6262b; border:2px solid #d6262b; border-radius:6px; padding:2px 4px 2px 8px; font-weight:700; font-size:14px; }
+.도장목록 button { color:var(--sub); font-size:16px; padding:0 4px; }
+
+/* ── 0.9.6 ⑪ 두 판 견주기 ── */
+.cmpview { background:var(--reader); z-index:5; }
+.cmpbox { flex:1; overflow:auto; position:relative; -webkit-overflow-scrolling:touch; }
+.cmpbox canvas { display:block; width:100%; height:auto; background:#fff; margin:0 auto; }
+.cmpbox.크게 canvas { width:200%; }
+.cmp알림 { position:absolute; left:50%; top:40%; transform:translate(-50%,-50%); background:rgba(20,22,26,.86); color:#fff; padding:10px 16px; border-radius:14px; font-size:14px; text-align:center; white-space:pre-line; }
+.cmpfoot { flex:none; display:flex; align-items:center; gap:6px; padding:8px 8px calc(10px + env(safe-area-inset-bottom)); background:var(--bar); border-top:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+.cmpfoot .pb { font-size:15px; padding:8px 10px; border-radius:999px; color:var(--bar-text); flex:none; }
+.cmpfoot .seg { flex:none; }
+.cmp쪽 { font-size:13px; color:var(--bar-text); min-width:64px; text-align:center; flex:none; }
+.cmpfoot .seg button { white-space:nowrap; }
+
+/* ── 0.9.7 ⑤ PDF · 그림 축척 재기 ── */
+.속 svg.재기층 { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+#measscale { font-weight:700; color:#0090c9; }
+.축척칩 { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 10px; }
+.축척칩 button { padding:8px 12px; border-radius:999px; background:var(--surface2); font-weight:600; font-size:14px; }
+.축척칩 button.on { background:var(--accent-soft); color:var(--accent-ink); font-weight:800; }
+.축척칩 button i { font-style:normal; font-size:11px; opacity:.8; }
+
+/* ── 0.9.8 작은 넷 — ⑰ 밤 보기 (일몰 후 ~ 일출 전 저절로) · ⑯ 목차 · ⑥ 표시 모아 보기 ── */
+.밤-b { font-size:18px; opacity:.45; }
+.밤-b.on { opacity:1; }
+#viewer.밤 .reader { background:#000; }
+#viewer.밤 .pg:not(.그림쪽) { background:#16181c; box-shadow:none; }
+#viewer.밤 .pg:not(.그림쪽) img { filter:invert(.9) hue-rotate(180deg); }
+.tlist { flex:1; overflow-y:auto; padding:6px 14px calc(24px + env(safe-area-inset-bottom)); }
+.tlist .목줄 { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:11px 4px; border-bottom:1px solid var(--line); font-size:15px; color:var(--text); }
+.tlist .목줄 .아 { width:28px; height:28px; border-radius:8px; display:grid; place-items:center; background:var(--surface2); flex:none; font-size:14px; font-weight:800; }
+.tlist .목줄 .글 { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tlist .목줄 .쪽번 { font-size:12px; color:var(--sub); flex:none; }
+.tlist .목줄.깊1 { padding-left:20px; font-size:14px; color:var(--sub); } .tlist .목줄.깊2 { padding-left:36px; font-size:13px; color:var(--sub); } .tlist .목줄.깊3 { padding-left:52px; font-size:13px; color:var(--sub); }
+
+/* ── 0.9.10 골라 복사 — 「복사」 → 틀 · 귀 넷 · 아래 단추 줄 (목업 1_읽을거리\골라복사_목업.html) ── */
+.골 { position:fixed; inset:0; z-index:7; touch-action:none; user-select:none; -webkit-user-select:none; }
+.골틀 { position:fixed; border:2px solid #fff; border-radius:2px; box-shadow:0 0 0 9999px rgba(0,0,0,.5); }
+.골틀 i { position:absolute; width:24px; height:24px; border-radius:50%; background:#fff; border:3px solid var(--accent); box-sizing:border-box; }
+.골틀 i::before { content:''; position:absolute; inset:-14px; }              /* 손가락 자리 넓힘 */
+.골틀 i[data-g="lt"] { left:-13px; top:-13px; } .골틀 i[data-g="rt"] { right:-13px; top:-13px; }
+.골틀 i[data-g="lb"] { left:-13px; bottom:-13px; } .골틀 i[data-g="rb"] { right:-13px; bottom:-13px; }
+.골치수 { position:absolute; left:50%; top:8px; transform:translateX(-50%); background:rgba(20,22,26,.86); color:#fff; font-size:13px; padding:2px 10px; border-radius:999px; white-space:nowrap; pointer-events:none; }
+.골안내 { position:fixed; left:12px; right:12px; top:calc(10px + env(safe-area-inset-top)); text-align:center; background:rgba(20,22,26,.86); color:#fff; font-size:13px; padding:8px 10px; border-radius:10px; pointer-events:none; z-index:1; }
+.골바 { position:fixed; left:0; right:0; bottom:0; display:flex; gap:6px; padding:8px 8px calc(12px + env(safe-area-inset-bottom)); background:var(--surface); box-shadow:0 -1px 0 var(--line); z-index:1; }
+.골바 button { flex:1 1 0; min-width:0; padding:12px 2px; border:0; border-radius:12px; background:var(--bg); color:var(--text); font:inherit; font-size:14px; font-weight:700; white-space:nowrap; }
+.골바 .주 { background:var(--btn); color:var(--on-btn); }
+.골치수.위 { top:auto; bottom:calc(100% + 10px); }
