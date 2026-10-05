@@ -2006,6 +2006,7 @@ $('#copy').addEventListener('click', () => { if (지금 && !보내는중) 골라
 
 // ④-6c 골라 복사 (0.9.10 · 목업 1_읽을거리\골라복사_목업.html · 전무님 「복사 누르면 틀 · 복사 · 보내기 · 새 그림 · 그림 + PDF · PPT + 도면」)
 //   「복사」 → 틀 (처음 = 보는 쪽 중 화면에 보이는 만큼 → 바로 「복사」 = 전처럼 통째) · 귀 끌기 = 크기 · 틀 안 끌기 = 옮김 · 틀 밖 끌기 = 새로 그림
+//   틀이 거의 전체(95% 넘게 · 처음)면 틀 안을 끌어도 새로 그림 — 처음엔 «틀 밖» 이 없어서 (시험에서 찾음)
 //   틀은 보는 쪽(도면은 도면 화면) 안에서만 · 펜 · 형광 · 메모 표시째 · 원본 안 고침 · 틀 띄운 동안 확대 · 밀기는 안 됨 (먼저 키우고 띄움)
 let 골 = null;                                                       // { 판:DOMRect(쪽 전체) · 한:{l,t,r,b}(고를 수 있는 곳) · 틀:{l,t,r,b} }
 function 골판() {
@@ -2027,7 +2028,7 @@ function 골라열기() {
   let el = $('#crop');
   if (!el) {
     el = document.createElement('div'); el.id = 'crop'; el.className = '골';
-    el.innerHTML = '<div class="골안내">귀를 끌어 크기 · 틀 밖을 끌면 새로 그림</div><div class="골틀"><span class="골치수"></span><i data-g="lt"></i><i data-g="rt"></i><i data-g="lb"></i><i data-g="rb"></i></div>'
+    el.innerHTML = '<div class="골안내">끌어서 고르기 · 귀 = 크기 · 틀 안 = 옮김</div><div class="골틀"><span class="골치수"></span><i data-g="lt"></i><i data-g="rt"></i><i data-g="lb"></i><i data-g="rb"></i></div>'
       + '<div class="골바"><button data-a="닫기">취소</button><button data-a="복사" class="주">📋 복사</button><button data-a="보내기">⇪ 보내기</button><button data-a="새그림">＋ 새 그림</button></div>';
     document.body.append(el);
     골손잡이(el);
@@ -2049,6 +2050,7 @@ function 골그리기() {
   Object.assign(b.style, { left: t.l + 'px', top: t.t + 'px', width: (t.r - t.l) + 'px', height: (t.b - t.t) + 'px' });
   const r = 골자름(), 몫 = 골원본크기();
   el.querySelector('.골치수').textContent = 몫 ? `${Math.round((r.x1 - r.x0) * 몫[0])} × ${Math.round((r.y1 - r.y0) * 몫[1])}` : '';
+  el.querySelector('.골치수').classList.toggle('위', t.t > 96);   // 위에 자리가 있으면 틀 밖 위로 (고른 내용을 안 가리게)
 }
 function 골원본크기() {                                              // 틀 위 치수 — 그림은 원본 화소 · PDF · PPT 는 복사될 화소 · 도면은 화면 화소
   const 판 = 골.판;
@@ -2069,7 +2071,7 @@ function 골손잡이(el) {
     const 한 = 골.한, t = 골.틀, x = 붙(e.clientX, 한.l, 한.r), y = 붙(e.clientY, 한.t, 한.b);
     const 귀 = e.target.closest('[data-g]')?.dataset.g;
     if (귀) 끌 = { 꼴: '귀', 귀, t0: { ...t } };
-    else if (e.clientX > t.l && e.clientX < t.r && e.clientY > t.t && e.clientY < t.b) 끌 = { 꼴: '옮김', x, y, t0: { ...t } };
+    else if (e.clientX > t.l && e.clientX < t.r && e.clientY > t.t && e.clientY < t.b && (t.r - t.l) * (t.b - t.t) < 0.95 * (한.r - 한.l) * (한.b - 한.t)) 끌 = { 꼴: '옮김', x, y, t0: { ...t } };   // 거의 전체인 틀(처음)은 안을 끌어도 새로 그림
     else 끌 = { 꼴: '새', x, y, t0: { ...t } };
     try { el.setPointerCapture(e.pointerId); } catch (e2) {}
   });
