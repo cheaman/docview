@@ -7,6 +7,19 @@
 //   ④ 일꾼(sw.js) 등록 · 아이폰 화면 손질 (두 손가락 확대 막기 · 홈 화면 안내)
 // 인터넷 : 처음 한 번 앱을 받을 때만. 문서는 이 폰 밖으로 나가지 않는다 (보내기는 사용자가 고른 앱으로만)
 'use strict';
+// ⓪ 카톡 안 브라우저면 바깥 브라우저(아이폰 사파리 · 갤럭시 크롬)로 넘김 (10-05 전무님 「카톡에서 누르면 자동으로 사파리로」)
+//   카톡 안에서는 홈 화면에 추가를 못 함 · kakaotalk://web/openExternal 은 공식 약속은 아니나 국내 사이트들이 씀 → 안 먹히면 안내 글만 보임
+if (/KAKAOTALK/i.test(navigator.userAgent)) {
+  location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
+  addEventListener('DOMContentLoaded', () => {
+    const 판 = document.createElement('div');
+    판.style.cssText = 'position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg,#f5f5f7);color:var(--ink,#111);font:17px/1.6 sans-serif;text-align:center';
+    판.innerHTML = /iPhone|iPad/.test(navigator.userAgent)
+      ? '<div><b>사파리로 여는 중</b><br>안 열리면 → 오른쪽 아래 「⋯」 → 「Safari에서 열기」</div>'
+      : '<div><b>인터넷 앱으로 여는 중</b><br>안 열리면 → 오른쪽 위 「⋮」 → 「다른 브라우저로 열기」</div>';
+    document.body.append(판);
+  });
+}
 (() => {
   const 최대 = 30;
   const 덧칸 = ['메모', '돌림', '묶음', '자리', '즐겨', '책갈피', '축척'];   // 문서마다 덧붙이는 칸 · 묶음(10-04) 과업 이름표 · 자리 · 즐겨 · 책갈피(10-05)
