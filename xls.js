@@ -45,8 +45,14 @@ const 주소풀기 = a => { const m = /^([A-Z]+)(\d+)$/.exec(a); if (!m) return 
   if (st) {
     const d = xml읽기(st);
     for (const f of 후손(d, 'numFmt')) 형식[f.getAttribute('numFmtId')] = f.getAttribute('formatCode');
+    // 칸 꾸밈 (10-06 직원 피드백 ④ 「컴퓨터 화면처럼」) — 굵게 · 가로 맞춤 · 줄바꿈 · 바탕(rgb 만 · 테마 색은 안 읽음)
+    const 글꼴들 = [...자식들(후손(d, 'fonts')[0] || d, 'font')].map(f => !!자식(f, 'b') && 자식(f, 'b').getAttribute('val') !== '0');
+    const 바탕들 = [...자식들(후손(d, 'fills')[0] || d, 'fill')].map(f => { const p = 자식(f, 'patternFill'); const c = p && p.getAttribute('patternType') === 'solid' ? 자식(p, 'fgColor')?.getAttribute('rgb') : null; return c && /^[0-9A-F]{8}$/i.test(c) ? '#' + c.slice(2) : null; });
     const xfs = 후손(d, 'cellXfs')[0];
-    if (xfs) for (const xf of 자식들(xfs, 'xf')) { const id = +xf.getAttribute('numFmtId') || 0; 모양.push({ 번호: id, 글: 형식[id] }); }
+    if (xfs) for (const xf of 자식들(xfs, 'xf')) {
+      const id = +xf.getAttribute('numFmtId') || 0, 줄 = 자식(xf, 'alignment');
+      모양.push({ 번호: id, 글: 형식[id], 꾸밈: { 굵게: 글꼴들[+xf.getAttribute('fontId') || 0], 바탕: 바탕들[+xf.getAttribute('fillId') || 0], 가로: 줄?.getAttribute('horizontal') || '', 줄바꿈: 줄?.getAttribute('wrapText') === '1' } });
+    }
   }
   const 시트들 = [];
   for (const s of 후손(책, 'sheet')) {
@@ -65,13 +71,19 @@ const 주소풀기 = a => { const m = /^([A-Z]+)(\d+)$/.exec(a); if (!m) return 
       else if (t === 'str' || t === 'e') 보일 = v ?? '';
       else if (t === 'b') 보일 = v === '1' ? 'TRUE' : 'FALSE';
       else if (v != null && v !== '') { 보일 = 엑셀.숫자글(+v, m.번호, m.글); 수 = !엑셀.날짜형식(m.번호, m.글); }
-      if (보일 === '') continue;
-      칸.set(rc[0] * 100000 + rc[1], { 글: 보일, 수 });
-      if (rc[0] > 최대행) 최대행 = rc[0]; if (rc[1] > 최대열) 최대열 = rc[1];
+      if (보일 === '' && !m.꾸밈?.바탕) continue;
+      칸.set(rc[0] * 100000 + rc[1], { 글: 보일, 수, 꾸밈: m.꾸밈 });
+      if (보일 !== '') { if (rc[0] > 최대행) 최대행 = rc[0]; if (rc[1] > 최대열) 최대열 = rc[1]; }
     }
     const 합침 = [];
     for (const m of 후손(d, 'mergeCell')) { const [a, b] = (m.getAttribute('ref') || '').split(':').map(주소풀기); if (a && b) 합침.push([a[0], a[1], b[0], b[1]]); }
-    시트들.push({ 이름, 칸, 합침, 최대행, 최대열, 잘림 });
+    // 열 너비 (글자 수 · 엑셀 단위) · 숨긴 열
+    const 열너비 = new Map(), 기본 = +(후손(d, 'sheetFormatPr')[0]?.getAttribute('defaultColWidth')) || 0;
+    for (const c of 후손(d, 'col')) {
+      const a = +c.getAttribute('min'), b = Math.min(+c.getAttribute('max'), 칸한도.열), w = c.getAttribute('hidden') === '1' ? 0 : +c.getAttribute('width');
+      if (a && b && isFinite(w)) for (let k = a - 1; k < b; k++) 열너비.set(k, w);
+    }
+    시트들.push({ 이름, 칸, 합침, 최대행, 최대열, 잘림, 열너비, 기본너비: 기본 });
   }
   if (!시트들.length) throw new Error('보이는 시트가 없음');
   return 엑셀.그리기(시트들);
@@ -96,13 +108,18 @@ const 주소풀기 = a => { const m = /^([A-Z]+)(\d+)$/.exec(a); if (!m) return 
   const u16 = new TextDecoder('utf-16le'), l1 = new TextDecoder('windows-1252');
   const 글풀기 = (자리, 글자수, 넓음) => 넓음 ? u16.decode(책.subarray(자리, 자리 + 글자수 * 2)) : l1.decode(책.subarray(자리, 자리 + 글자수));
   // 공유 문자열 (SST + CONTINUE — 문자열이 CONTINUE 경계를 넘으면 경계 뒤 첫 바이트가 새 «넓음» 표시)
-  const 공유 = [], 형식 = {}, 모양 = [], 시트목록 = [];
+  const 공유 = [], 형식 = {}, 모양 = [], 꾸밈들 = [], 굵은글꼴 = [], 시트목록 = [];
   let 암호 = false;
   for (let k = 0; k < 기록들.length; k++) {
     const r = 기록들[k];
     if (r.종류 === 0x002f) 암호 = true;
     else if (r.종류 === 0x041e) { const id = v.getUint16(r.자리, true), n = v.getUint16(r.자리 + 2, true), 넓 = 책[r.자리 + 4] & 1; 형식[id] = 글풀기(r.자리 + 5, n, 넓); }
-    else if (r.종류 === 0x00e0) 모양.push(v.getUint16(r.자리 + 2, true));
+    else if (r.종류 === 0x0031) 굵은글꼴.push(v.getUint16(r.자리 + 6, true) >= 700);        // FONT — 굵기 (10-06 꾸밈)
+    else if (r.종류 === 0x00e0) {                                                              // XF — 숫자 모양 · 글꼴 · 가로 맞춤 · 줄바꿈
+      모양.push(v.getUint16(r.자리 + 2, true));
+      const 글꼴 = v.getUint16(r.자리, true), 맞춤 = 책[r.자리 + 6];
+      꾸밈들.push({ 글꼴: 글꼴 >= 4 ? 글꼴 - 1 : 글꼴, 가로: ['', 'left', 'center', 'right', '', 'justify', 'center'][맞춤 & 7] || '', 줄바꿈: !!(맞춤 & 8) });
+    }
     else if (r.종류 === 0x0085) { const n = 책[r.자리 + 6], 넓 = 책[r.자리 + 7] & 1; 시트목록.push({ 위치: v.getUint32(r.자리, true), 숨김: 책[r.자리 + 4] & 3, 종류: 책[r.자리 + 5], 이름: 글풀기(r.자리 + 8, n, 넓) }); }
     else if (r.종류 === 0x00fc) {
       const 조각 = [r]; while (기록들[k + 1]?.종류 === 0x003c) 조각.push(기록들[++k]);
@@ -128,38 +145,48 @@ const 주소풀기 = a => { const m = /^([A-Z]+)(\d+)$/.exec(a); if (!m) return 
     }
   }
   if (암호) throw new Error('암호 걸린 엑셀 → 못 엶');
+  for (const m of 꾸밈들) m.굵게 = !!굵은글꼴[m.글꼴];
   const 숫자 = (xf, n) => { const id = 모양[xf] ?? 0; return { 글: 엑셀.숫자글(n, id, 형식[id]), 수: !엑셀.날짜형식(id, 형식[id]) }; };
   const RK = x => { let n; if (x & 2) n = x >> 2; else { const b = new DataView(new ArrayBuffer(8)); b.setUint32(4, x & 0xfffffffc, true); n = b.getFloat64(0, true); } return x & 1 ? n / 100 : n; };
   const 시트들 = [];
   for (const 시 of 시트목록) {
     if (시.숨김 || 시.종류 !== 0) continue;                    // 숨긴 시트 · 차트 시트 빼고
     let k = 기록들.findIndex(r => r.자리 - 4 === 시.위치); if (k < 0) continue;
-    const 칸 = new Map(), 합침 = []; let 최대행 = 0, 최대열 = 0, 잘림 = false, 계산글칸 = null;
+    const 칸 = new Map(), 합침 = [], 열너비 = new Map(); let 최대행 = 0, 최대열 = 0, 잘림 = false, 계산글칸 = null, 기본너비 = 0;
+    let 지금xf = 0;
     const 넣기 = (행, 열, 값) => {
       if (행 >= 칸한도.행 || 열 >= 칸한도.열) { 잘림 = true; return; }
       if (값.글 === '') return;
+      값.꾸밈 = 꾸밈들[지금xf];
       칸.set(행 * 100000 + 열, 값); if (행 > 최대행) 최대행 = 행; if (열 > 최대열) 최대열 = 열;
     };
     for (k++; k < 기록들.length; k++) {
       const r = 기록들[k], a = r.자리; if (r.종류 === 0x000a) break;
       const 행 = () => v.getUint16(a, true), 열 = () => v.getUint16(a + 2, true), xf = () => v.getUint16(a + 4, true);
+      if ([0x00fd, 0x0203, 0x027e, 0x0204, 0x0205, 0x0006].includes(r.종류)) 지금xf = v.getUint16(a + 4, true);   // 칸 기록만 (STRING 0x0207 은 자리가 다름)
+      if (r.종류 === 0x007d) {                                  // COLINFO — 열 너비 (1/256 글자) · 숨김
+        const 끝열 = Math.min(v.getUint16(a + 2, true), 칸한도.열 - 1), w = 책[a + 8] & 1 ? 0 : v.getUint16(a + 4, true) / 256;
+        for (let c = v.getUint16(a, true); c <= 끝열; c++) 열너비.set(c, w);
+        continue;
+      }
+      if (r.종류 === 0x0055) { 기본너비 = v.getUint16(a, true) + 0.71; continue; }   // DEFCOLWIDTH (글자 수 · 여백 더함)
       if (r.종류 === 0x00fd) 넣기(행(), 열(), { 글: 공유[v.getUint32(a + 6, true)] ?? '', 수: false });
       else if (r.종류 === 0x0203) 넣기(행(), 열(), 숫자(xf(), v.getFloat64(a + 6, true)));
       else if (r.종류 === 0x027e) 넣기(행(), 열(), 숫자(xf(), RK(v.getInt32(a + 6, true))));
-      else if (r.종류 === 0x00bd) { const 끝열 = v.getUint16(a + r.길이 - 2, true); for (let c = 열(), q = a + 4; c <= 끝열; c++, q += 6) 넣기(행(), c, 숫자(v.getUint16(q, true), RK(v.getInt32(q + 2, true)))); }
+      else if (r.종류 === 0x00bd) { const 끝열 = v.getUint16(a + r.길이 - 2, true); for (let c = 열(), q = a + 4; c <= 끝열; c++, q += 6) { 지금xf = v.getUint16(q, true); 넣기(행(), c, 숫자(지금xf, RK(v.getInt32(q + 2, true)))); } }
       else if (r.종류 === 0x0204) { const n = v.getUint16(a + 6, true), 넓 = 책[a + 8] & 1; 넣기(행(), 열(), { 글: 글풀기(a + 9, n, 넓), 수: false }); }
       else if (r.종류 === 0x0205) { const 값 = 책[a + 6], 오류 = 책[a + 7]; 넣기(행(), 열(), { 글: 오류 ? '#오류' : 값 ? 'TRUE' : 'FALSE', 수: false }); }
       else if (r.종류 === 0x0006) {                             // 계산식 — 저장된 값
         if (v.getUint16(a + 12, true) === 0xffff) {
           const 형 = 책[a + 6];
-          if (형 === 0) 계산글칸 = [행(), 열()];
+          if (형 === 0) 계산글칸 = [행(), 열(), 지금xf];
           else if (형 === 1) 넣기(행(), 열(), { 글: 책[a + 8] ? 'TRUE' : 'FALSE', 수: false });
           else if (형 === 2) 넣기(행(), 열(), { 글: '#오류', 수: false });
         } else 넣기(행(), 열(), 숫자(xf(), v.getFloat64(a + 6, true)));
-      } else if (r.종류 === 0x0207 && 계산글칸) { const n = v.getUint16(a, true), 넓 = 책[a + 2] & 1; 넣기(계산글칸[0], 계산글칸[1], { 글: 글풀기(a + 3, n, 넓), 수: false }); 계산글칸 = null; }
+      } else if (r.종류 === 0x0207 && 계산글칸) { const n = v.getUint16(a, true), 넓 = 책[a + 2] & 1; 지금xf = 계산글칸[2]; 넣기(계산글칸[0], 계산글칸[1], { 글: 글풀기(a + 3, n, 넓), 수: false }); 계산글칸 = null; }
       else if (r.종류 === 0x00e5) { const n = v.getUint16(a, true); for (let m = 0; m < n; m++) { const q = a + 2 + m * 8; 합침.push([v.getUint16(q, true), v.getUint16(q + 4, true), v.getUint16(q + 2, true), v.getUint16(q + 6, true)]); } }
     }
-    시트들.push({ 이름: 시.이름, 칸, 합침, 최대행, 최대열, 잘림 });
+    시트들.push({ 이름: 시.이름, 칸, 합침, 최대행, 최대열, 잘림, 열너비, 기본너비 });
   }
   if (!시트들.length) throw new Error('보이는 시트가 없음');
   return 엑셀.그리기(시트들);
@@ -208,9 +235,19 @@ const 주소풀기 = a => { const m = /^([A-Z]+)(\d+)$/.exec(a); if (!m) return 
       시작.set(r0 * 100000 + c0, [r1 - r0 + 1, c1 - c0 + 1]);
       for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (r !== r0 || c !== c0) 덮임.add(r * 100000 + c);
     }
-    const t = 만들기('table', '시트');
+    // 열 너비가 있는 시트(XLSX · XLS)는 컴퓨터 엑셀처럼 «격자» (10-06 직원 피드백 ④) — 파일의 열 너비 · 줄바꿈 없음 · 빈 옆칸으로 글이 넘침 · 꾸밈
+    //   HTML 표(이름만 .xls)는 너비 정보가 없어 전처럼 글 따라 늘어나는 표
+    const 격자 = !!s.열너비, t = 만들기('table', 격자 ? '시트 격자' : '시트');
+    const 폭 = c => { const 글자 = s.열너비?.has(c) ? s.열너비.get(c) : (s.기본너비 || 8.43); return 글자 <= 0 ? 0 : +(글자 * 0.5 + 0.36).toFixed(2); };   // 엑셀 글자 수 → em (한 글자 ≈ 7px · 표 글씨 ≈ 14px)
+    if (격자) {
+      const 묶 = 만들기('colgroup'), 첫 = 만들기('col'); 첫.style.width = '2.8em'; 묶.append(첫);
+      let 합 = 2.8;
+      for (let c = 0; c <= s.최대열; c++) { const w = 폭(c), col = 만들기('col'); col.style.width = w + 'em'; 합 += w; 묶.append(col); }
+      t.append(묶); t.style.width = 합.toFixed(2) + 'em';
+    }
+    const 숨 = c => 격자 && 폭(c) === 0;
     const 머리 = 만들기('tr'); 머리.append(만들기('th', '모서리'));
-    for (let c = 0; c <= s.최대열; c++) 머리.append(만들기('th', null, 열이름(c)));
+    for (let c = 0; c <= s.최대열; c++) 머리.append(만들기('th', 숨(c) ? '숨' : null, 열이름(c)));
     t.append(머리);
     for (let r = 0; r <= s.최대행; r++) {
       const tr = 만들기('tr'); tr.append(만들기('th', null, String(r + 1)));
@@ -218,6 +255,15 @@ const 주소풀기 = a => { const m = /^([A-Z]+)(\d+)$/.exec(a); if (!m) return 
         const 열쇠 = r * 100000 + c; if (덮임.has(열쇠)) continue;
         const 값 = s.칸.get(열쇠), td = 만들기('td', 값?.수 ? '수' : null, 값?.글 ?? '');
         const 합 = 시작.get(열쇠); if (합) { if (합[0] > 1) td.rowSpan = 합[0]; if (합[1] > 1) td.colSpan = 합[1]; }
+        if (격자) {
+          const 꾸 = 값?.꾸밈;
+          if (숨(c)) td.classList.add('숨');
+          if (꾸?.굵게) td.style.fontWeight = '700';
+          if (꾸?.바탕) { td.style.background = 꾸.바탕; td.style.color = '#1d1d1f'; }
+          if (꾸?.가로 && 값?.글) td.style.textAlign = 꾸.가로;
+          if (꾸?.줄바꿈 || /\n/.test(값?.글 || '')) td.classList.add('줄');
+          else if (값?.글 && !값.수 && !합 && (!꾸?.가로 || 꾸.가로 === 'left') && !s.칸.get(열쇠 + 1)?.글 && !덮임.has(열쇠 + 1)) td.classList.add('넘침');   // 엑셀처럼 빈 옆칸으로
+        }
         tr.append(td);
       }
       t.append(tr);

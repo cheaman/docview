@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta name="docview-ver" content="1006-085919">
+<meta name="docview-ver" content="1006-101007">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <link rel="stylesheet" href="app.css">
@@ -54,10 +54,11 @@
 
 <!-- ③-① 최근 목록 -->
 <section id="home" class="view">
-  <header class="bar" id="homebar"><span class="dsm-mark" aria-hidden="true"><b>DSM</b><i><u></u><u></u><u></u><u></u></i></span><h1>문서 보기</h1><button class="tovideo 찾기단추" id="gfind" aria-label="전체 찾기"><svg class="ico"><use href="#i-find"/></svg></button><button class="tovideo" id="selbtn">고르기</button><a class="tovideo" href="video/index.html">🎬 영상</a></header>
+  <header class="bar" id="homebar"><span class="dsm-mark" aria-hidden="true"><b>DSM</b><i><u></u><u></u><u></u><u></u></i></span><h1>문서 보기</h1><button class="tovideo 찾기단추" id="gfind" aria-label="전체 찾기"><svg class="ico"><use href="#i-find"/></svg></button><button class="tovideo" id="selbtn">고르기</button><a class="tovideo" href="video/index.html" aria-label="영상">🎬<span class="좁으면숨김"> 영상</span></a><a class="tovideo 도움단추" id="helpbtn" href="help.html" aria-label="쓰는 법">?</a></header>
   <header class="bar" id="selbar" hidden><h1 id="selcnt">0개 고름</h1><button class="tovideo" id="selall">다 고르기</button><button class="tovideo" id="seldone">끝</button></header>
   <header class="bar findbar" id="gbar" hidden><button class="ib" id="gclose" aria-label="찾기 닫기"><svg class="ico"><use href="#i-back"/></svg></button><label class="field"><svg class="ico"><use href="#i-find"/></svg><input id="gq" type="search" placeholder="파일 이름 · 문서 속 글" enterkeyhint="search" autocomplete="off"></label></header>
   <div id="kinds" class="칩줄" hidden></div>
+  <div id="helpnote" class="처음알림" hidden><a href="help.html"><b>처음이세요?</b> → 「쓰는 법」 3분 둘러보기</a><button id="helpnoteclose" aria-label="닫기">✕</button></div>
   <main id="list" class="list"></main>
   <div id="empty" class="empty" hidden>
     <div class="big"><svg class="ico"><use href="#i-doc"/></svg></div>
@@ -67,6 +68,8 @@
       <div><b>되는 파일</b> → PDF · 한글(HWP · HWPX) · 워드(DOC · DOCX) · TXT · 엑셀(XLS · XLSX) · PPT(PPTX · 옛 PPT) · HTML · 그림(JPG · PNG · HEIC 등) · 도면(DXF) · 압축(ZIP — 풀지 않고 안을 봄)</div>
       <div><b>녹화 영상</b> → 갤러리에서 <span class="pill">공유</span> → 문서 보기 → 장면판으로 클로드에게 (위 🎬)</div>
     </div>
+    <a class="도움줄" href="help.html">📖 쓰는 법</a>
+  </div>
   </div>
   <button id="pick" class="fab"><svg class="ico"><use href="#i-open"/></svg>파일 열기</button>
   <div id="selfoot" class="selfoot" hidden><button id="selpdf" class="새것" hidden>📄 PDF 로</button><button id="selcmp" class="새것" hidden>⇄ 견주기</button><button id="selfav">⭐ 즐겨찾기</button><button id="selgroup">🏷 묶음</button><button id="seldel" class="지움">지우기</button></div>

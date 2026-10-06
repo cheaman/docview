@@ -20,6 +20,7 @@ const PDF길 = window.웹PDF || {
   찾기: (id, q) => fetch(`/pdf/${encodeURIComponent(id)}/find?q=${encodeURIComponent(q)}`).then(r => r.json()),
   놓기: () => {},
   ...(window.Android ? { 글: id => fetch(`/pdf/${encodeURIComponent(id)}/text`).then(r => r.json()) } : {}),   // 쪽마다 글 (0.9.6 · 안드로이드 15 이상)
+  ...(window.Android?.pdfPassword ? { 암호: (id, pw) => window.Android.pdfPassword(id, pw) } : {}),            // 암호 PDF (10-06 · 안드로이드 15 이상)
 };
 const 그림놓기 = img => { if (img?.src?.startsWith('blob:')) URL.revokeObjectURL(img.src); };
 const 그림주소놓기 = u => { if (typeof u === 'string' && u.startsWith('blob:')) URL.revokeObjectURL(u); };
@@ -155,9 +156,18 @@ function 목록그리기() {
     h += '</div>';
   }
   if (목록.length && !보일것.length) h += '<div class="빈칸글">이 칩에 든 문서 없음</div>';
+  if (목록.length && !고름) h += '<a class="도움줄" href="help.html">📖 쓰는 법</a>';   // 목록 맨 아래 (10-06 쓰는 법)
   $('#list').innerHTML = h;
   고르기판갱신();
 }
+// 쓰는 법 처음 알림 (10-06) — 설치 · 새 판 뒤 한 번 · 닫거나 쓰는 법을 열면 다시 안 뜸
+(() => {
+  let 봄 = false; try { 봄 = !!localStorage.getItem('쓰는법봄'); } catch (e) {}
+  const 표시 = () => { try { localStorage.setItem('쓰는법봄', '1'); } catch (e) {} $('#helpnote').hidden = true; };
+  $('#helpnote').hidden = 봄;
+  $('#helpnoteclose').addEventListener('click', 표시);
+  document.addEventListener('click', e => { if (e.target.closest('a[href="help.html"]')) 표시(); });
+})();
 // 목록 줄의 «보던 자리» · 책갈피 수 · 막대 (10-05) — 끝까지 본 문서 · 맨 앞은 막대 없음
 const 즐겨이름 = '⭐ 즐겨찾기';
 function 자리글(d) {
@@ -949,7 +959,7 @@ async function 글문서열기(d) {
     $('#vsub').textContent = 종류 + (결과.덧 ? ' · ' + 결과.덧 : '');
     if (결과.알림) 알림(`<b>${글(결과.알림)}</b>`);
     if (!안.textContent.trim() && !안.querySelector('img')) 알림('<b>글자가 없는 문서</b><div class="sm">그림만 든 문서일 수 있음</div>');
-    도구보이기(['txt', 'xlsx', 'xls', 'ppt'].includes(지금.ext) ? ['find', 'size'] : 지금.ext === 'pptx' ? ['find', 'size', 'pptmode'] : ['find', 'size', 'plain']);
+    도구보이기(결과.켜고 ? [] : ['txt', 'xlsx', 'xls', 'ppt'].includes(지금.ext) ? ['find', 'size'] : 지금.ext === 'pptx' ? ['find', 'size', 'pptmode'] : ['find', 'size', 'plain']);   // 켜고 = HTML 막힌 칸 (찾기 · 글씨가 안 닿음)
     if (지금.ext === 'pptx') 피피티모드글();
     자리되살리기(); 책갈피단추(); 글적어두기(d);
   } catch (e) {                                         // 모양을 못 그리면 글자만이라도
@@ -1009,11 +1019,40 @@ $('#size').addEventListener('click', () => {
     <div class="opt"><span class="lab">바탕</span>${고름('바탕', [['기본', '기본'], ['종이', '종이'], ['어둡게', '어둡게']], 글설정.바탕)}</div>`);
   $('#sheet').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.d) { 글설정.크기 = Math.min(28, Math.max(13, 글설정.크기 + Number(b.dataset.d))); $('#szv').textContent = 글설정.크기; }
+    if (b.dataset.d) { 글설정.크기 = Math.min(글크기끝[1], Math.max(글크기끝[0], 글설정.크기 + Number(b.dataset.d))); $('#szv').textContent = 글설정.크기; }
     const seg = b.closest('.seg');
     if (seg) { 글설정[seg.dataset.k] = seg.dataset.k === '줄' ? Number(b.dataset.v) : b.dataset.v; seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }
     글설정입히기();
   };
+});
+// 글 문서 두 손가락 = 글씨 크기 (10-06 직원 피드백 ① 「한글 확대 · 축소가 안 됨」) — 한글 · 워드 · 엑셀 · TXT · HTML · PPT 글로
+//   움직이는 동안은 그림만 키우고(transform · 긴 문서도 안 버벅임) 손을 떼면 글씨 크기로 굳힘 · 손가락 가운데 글줄이 그 자리에 남게
+const 글크기끝 = [10, 40];
+let 글집기 = null;
+$('#flow').addEventListener('touchstart', e => {
+  if (e.touches.length !== 2 || !지금) { 글집기 = null; return; }
+  const [a, b] = e.touches, 안 = $('#flowin').getBoundingClientRect(), 틀 = $('#flow').getBoundingClientRect();
+  const cx = (a.clientX + b.clientX) / 2, cy = (a.clientY + b.clientY) / 2;
+  글집기 = { d0: Math.max(20, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)), 배: 1, y: cy - 틀.top, 앞: ($('#flow').scrollTop + cy - 틀.top) / $('#flow').scrollHeight };
+  $('#flowin').style.transformOrigin = `${cx - 안.left}px ${cy - 안.top}px`;
+}, { passive: true });
+$('#flow').addEventListener('touchmove', e => {
+  if (!글집기 || e.touches.length !== 2) return;
+  e.preventDefault();
+  const [a, b] = e.touches;
+  const 새 = Math.min(글크기끝[1], Math.max(글크기끝[0], 글설정.크기 * Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) / 글집기.d0));
+  글집기.배 = 새 / 글설정.크기;
+  $('#flowin').style.transform = `scale(${글집기.배})`;
+}, { passive: false });
+$('#flow').addEventListener('touchend', e => {
+  if (!글집기 || e.touches.length >= 2) return;
+  const { 배, 앞, y } = 글집기; 글집기 = null;
+  $('#flowin').style.transform = ''; $('#flowin').style.transformOrigin = '';
+  const 새 = Math.round(Math.min(글크기끝[1], Math.max(글크기끝[0], 글설정.크기 * 배)));
+  if (새 === 글설정.크기) return;
+  글설정.크기 = 새; 글설정입히기();
+  $('#flow').scrollTop = 앞 * $('#flow').scrollHeight - y;
+  칩(`글씨 ${새}`);
 });
 
 // 찾기 — 낱말을 모두 칠하고 ∧ ∨ 로 옮겨 다님
@@ -1103,6 +1142,25 @@ function 알림(html) { $('#note').innerHTML = `<div>${html}</div>`; $('#note').
 
 // ④ PDF ───────────────────────────────────────────
 let 지켜보기 = null;
+// 암호 PDF (10-06 직원 피드백 ② 「PDF 앱은 암호를 넣고 보는데 여기선 열기 자체가 안 됨」) — 갤럭시 = 안드로이드 15 이상 내장 · 웹 = pdf.js
+//   암호는 껍데기 메모리에만 (앱 · 창을 닫으면 잊음 · 폰에 저장 안 함)
+function 암호묻기(d, 정보) {
+  const 길 = 쪽길();
+  if (!정보.can || !길.암호) return 알림(`<b>암호 걸린 PDF → 이 폰에선 못 엶</b><div class="sm">안드로이드 15 이상에서 열림${폰 ? ' · 이 폰 ' + 글(String(다리.android?.() || '').split(' · ')[0]) : ''} · 아이폰은 됨</div>`);
+  판열기(`<h3>🔒 암호 걸린 PDF</h3>
+    ${정보.tried ? '<div class="판설명" style="color:var(--danger,#d70015)">암호가 틀림 → 다시 넣기</div>' : '<div class="판설명">보낸 곳이 알려 준 암호 · 급여명세서는 흔히 생년월일 6자리</div>'}
+    <div class="opt"><span class="lab">암호</span><input id="pdfpw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" style="flex:1"></div>
+    <div class="row 끝줄"><span style="flex:1"></span><button class="btn plain" onclick="판닫기()">닫기</button><button class="btn" id="pdfpwok">열기</button></div>
+    <div class="판설명">암호는 이 폰에 저장하지 않음 · 앱을 닫으면 다시 물음</div>`);
+  const 열기누름 = () => {
+    const pw = $('#pdfpw').value; if (!pw) return $('#pdfpw').focus();
+    길.암호(d.id, pw); 판닫기();
+    if (지금?.id === d.id) { $('#note').hidden = true; pdf열기(d); }
+  };
+  $('#pdfpwok').onclick = 열기누름;
+  $('#pdfpw').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); 열기누름(); } });
+  setTimeout(() => $('#pdfpw').focus(), 60);
+}
 async function pdf열기(d) {
   let 정보;
   try {
@@ -1111,7 +1169,7 @@ async function pdf열기(d) {
     정보 = { error: '깨짐', detail: (폰 || 웹 ? '' : 'PC 시험 화면 · ') + String(e.message || e) };
   }
   if (지금?.id !== d.id) return;
-  if (정보.error === '암호') return 알림('<b>암호 걸린 PDF → 아직 못 엶</b>');
+  if (정보.error === '암호') return 암호묻기(d, 정보);
   if (정보.error === '원본 없음') return 알림('<b>원본 없음</b><div class="sm">목록의 ⋯ → 목록에서 빼기 → 다시 받아 열기</div>');
   if (정보.error) return 알림(`<b>열 수 없음 · 파일이 깨졌을 수 있음</b><div class="sm">${글(정보.detail || 정보.error)}</div>`);
   지금.쪽수 = 정보.pages;

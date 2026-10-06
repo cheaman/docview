@@ -154,6 +154,7 @@ if (/KAKAOTALK/i.test(navigator.userAgent)) {
 
   // ③ 웹PDF — pdf.js 는 처음 PDF 를 열 때 한 번 불러옴 (모듈 · 일꾼)
   let 라이브러리약속 = null, 열린 = null;              // 열린 = { id, 약속, 글: Map(쪽 → 글자 배열) }
+  const 암호들 = new Map();                          // 암호 PDF (10-06 직원 피드백 ②) — 이 창이 열린 동안만 · 저장 안 함
   const 라이브러리 = () => (라이브러리약속 ||= import('./pdfjs/pdf.min.mjs').then(lib => {
     lib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.mjs'; return lib;
   }));
@@ -165,7 +166,7 @@ if (/KAKAOTALK/i.test(navigator.userAgent)) {
       const r = await fetch('doc/' + encodeURIComponent(id));
       if (!r.ok) throw Object.assign(new Error('원본 없음'), { 원본없음: true });
       const data = new Uint8Array(await r.arrayBuffer());
-      return lib.getDocument({ data, cMapUrl: 'pdfjs/cmaps/', cMapPacked: true, standardFontDataUrl: 'pdfjs/standard_fonts/', wasmUrl: 'pdfjs/wasm/', isEvalSupported: false, enableXfa: false }).promise;
+      return lib.getDocument({ data, password: 암호들.get(id), cMapUrl: 'pdfjs/cmaps/', cMapPacked: true, standardFontDataUrl: 'pdfjs/standard_fonts/', wasmUrl: 'pdfjs/wasm/', isEvalSupported: false, enableXfa: false }).promise;
     })();
     열린 = { id, 약속, 글: new Map() };
     약속.catch(() => { if (열린?.약속 === 약속) 열린 = null; });
@@ -191,7 +192,7 @@ if (/KAKAOTALK/i.test(navigator.userAgent)) {
         return { pages: doc.numPages, sizes };
       } catch (e) {
         if (e?.원본없음) return { error: '원본 없음' };
-        if (e?.name === 'PasswordException') return { error: '암호', detail: e.message };
+        if (e?.name === 'PasswordException') { const 넣었나 = 암호들.has(id); 암호들.delete(id); return { error: '암호', detail: e.message, tried: 넣었나, can: true }; }
         return { error: '깨짐', detail: `${e?.name || ''} ${e?.message || e}`.trim() };
       }
     },
@@ -209,6 +210,7 @@ if (/KAKAOTALK/i.test(navigator.userAgent)) {
       return URL.createObjectURL(b);
     }),
     놓기: u => { if (typeof u === 'string' && u.startsWith('blob:')) URL.revokeObjectURL(u); },
+    암호(id, pw) { 암호들.set(id, pw); if (열린?.id === id) { 열린.약속.then(d => d.destroy()).catch(() => {}); 열린 = null; } },
     // 목차 (0.9.8 ⑯) — pdf.js 책갈피 → [{ 글, 쪽, 깊이 }]
     async 목차(id) {
       const doc = await 문서(id), ol = await doc.getOutline().catch(() => null), 목 = [];

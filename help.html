@@ -1,0 +1,245 @@
+<!doctype html>
+<!-- 쓰는 법 (2026-10-06 · 목업 1_읽을거리\쓰는법_목업.html 승인) — 앱 안 첫 화면 「?」 · 목록 맨 아래 · 웹 …/docview/help.html (같은 파일)
+     화면 그림 help/*.jpg 는 3_시험\시나리오_쓰는법그림.mjs 가 연습 문서로 뜸 (회사 자료 없음) · 앱 화면이 바뀌면 다시 뜸 -->
+<html lang="ko" class="dsm">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>문서 보기 — 쓰는 법</title>
+<link rel="stylesheet" href="dsm/dsm.css">
+<style>
+body { margin:0; font:15px/1.65 var(--dsm-font); background:var(--dsm-bg); color:var(--dsm-ink); -webkit-text-size-adjust:100%; }
+.머리 { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:8px; padding:calc(10px + env(safe-area-inset-top)) 12px 10px; background:var(--dsm-bg); border-bottom:1px solid var(--dsm-line); }
+.머리 a { width:40px; height:40px; display:grid; place-items:center; font-size:26px; color:var(--dsm-c-ink); text-decoration:none; }
+.머리 h1 { flex:1; margin:0; font-size:19px; }
+.머리 small { color:var(--dsm-dim); font-size:13px; }
+main { max-width:640px; margin:0 auto; padding:12px 14px 80px; }
+section { scroll-margin-top:70px; }
+h2 { font-size:19px; margin:30px 2px 10px; display:flex; align-items:center; gap:8px; }
+h2 b { display:inline-grid; place-items:center; min-width:28px; height:28px; border-radius:9px; background:var(--dsm-c-btn); color:var(--dsm-on-btn); font-size:15px; }
+h3 { font-size:16px; margin:20px 2px 6px; }
+.카드 { background:var(--dsm-card); border-radius:14px; box-shadow:var(--dsm-shadow); padding:12px 14px; margin:8px 0; }
+.흐림 { color:var(--dsm-dim); font-size:13.5px; }
+.차례 a { display:flex; align-items:center; gap:10px; padding:10px 2px; border-bottom:1px solid var(--dsm-line); color:inherit; text-decoration:none; }
+.차례 a:last-child { border:0; }
+.차례 i { font-style:normal; width:28px; height:28px; display:grid; place-items:center; border-radius:8px; background:var(--dsm-chip); }
+.차례 span { flex:1; } .차례 em { font-style:normal; color:var(--dsm-faint); }
+.기능 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.기능 a { background:var(--dsm-card); border-radius:12px; padding:10px 11px; box-shadow:var(--dsm-shadow); color:inherit; text-decoration:none; }
+.기능 b { display:block; font-size:14.5px; } .기능 small { display:block; color:var(--dsm-dim); font-size:13px; line-height:1.4; }
+dl.형식 { display:grid; grid-template-columns:64px 1fr; margin:0; background:var(--dsm-card); border-radius:12px; overflow:hidden; box-shadow:var(--dsm-shadow); }
+dl.형식 > * { padding:9px 11px; border-bottom:1px solid var(--dsm-line); margin:0; }
+dl.형식 dt { font-weight:700; } dl.형식 dd small { display:block; color:var(--dsm-dim); font-size:13px; }
+.점 { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:1px; }
+.됨 { background:var(--dsm-ok); } .일부 { background:var(--dsm-warn); } .안됨 { background:var(--dsm-bad); }
+.못 { color:var(--dsm-bad); }
+ol.누름 { margin:6px 0; padding:0; list-style:none; counter-reset:n; }
+ol.누름 li { counter-increment:n; display:flex; gap:9px; margin:7px 0; }
+ol.누름 li::before { content:counter(n); flex:none; width:22px; height:22px; border-radius:50%; background:var(--dsm-c-btn); color:var(--dsm-on-btn); font:700 12.5px/22px var(--dsm-font); text-align:center; margin-top:1px; }
+.단 { display:inline-block; padding:0 7px; border-radius:6px; background:var(--dsm-chip); font-weight:700; white-space:nowrap; }
+figure { margin:10px auto; max-width:300px; text-align:center; }
+figure img { width:100%; border-radius:18px; box-shadow:0 0 0 1px var(--dsm-line), var(--dsm-shadow); background:var(--dsm-card); }
+figcaption { color:var(--dsm-dim); font-size:13px; margin-top:4px; }
+.알아둘것 { background:var(--dsm-warn-bg); border-radius:12px; padding:10px 13px; margin:10px 0; font-size:14px; }
+.알아둘것 b:first-child { display:block; margin-bottom:2px; }
+.서명 { text-align:center; color:var(--dsm-faint); font-size:12px; margin-top:40px; }
+</style>
+</head>
+<body>
+<header class="머리"><a href="index.html" id="뒤" aria-label="돌아가기">‹</a><h1>쓰는 법</h1><small id="판"></small></header>
+<main>
+
+<div class="카드">
+  <b>문서 보기는</b><br>
+  카톡으로 받은 문서 → 광고 · 가입 없이 보기<br>
+  → 펜 · 도장 얹어 다시 보내기<br>
+  <span class="흐림">문서는 폰 밖으로 안 나감 · 원본은 안 바뀜</span>
+</div>
+
+<div class="카드 차례">
+  <a href="#docs"><i>📄</i><span>열 수 있는 문서</span><em>›</em></a>
+  <a href="#core"><i>★</i><span>핵심 기능 한눈에</span><em>›</em></a>
+  <a href="#s1"><i>1</i><span>처음 — 설치 · 문서 열기</span><em>›</em></a>
+  <a href="#s2"><i>2</i><span>보기 — 확대 · 쪽 · 찾기 · 밤</span><em>›</em></a>
+  <a href="#s3"><i>3</i><span>표시 — 펜 · 도형 · 도장</span><em>›</em></a>
+  <a href="#s4"><i>4</i><span>내보내기 — 보내기 · 골라 복사</span><em>›</em></a>
+  <a href="#s5"><i>5</i><span>현장 — 축척 재기 · 두 판 견주기 · 도면</span><em>›</em></a>
+  <a href="#s6"><i>6</i><span>정리 — 고르기 · 묶음 · ⭐ · 전체 찾기</span><em>›</em></a>
+  <a href="#s7"><i>7</i><span>문서마다 — 한글 · 엑셀 · 암호 PDF · 급여명세서</span><em>›</em></a>
+  <a href="#faq"><i>?</i><span>안 될 때 · 자주 묻는 것</span><em>›</em></a>
+</div>
+
+<section id="docs">
+<h2><b>📄</b>열 수 있는 문서</h2>
+<p class="흐림"><span class="점 됨"></span>됨 · <span class="점 일부"></span>일부 · <span class="점 안됨"></span>안 됨</p>
+<dl class="형식">
+  <dt>PDF</dt><dd><span class="점 됨"></span>쪽 모양 그대로 · 쪽 목록 · 목차 · 글 찾기<small>🔒 암호 PDF → 암호 넣고 열기 (갤럭시는 안드로이드 15 이상)</small></dd>
+  <dt>한글</dt><dd><span class="점 됨"></span>HWP · HWPX · 글 · 표 · 그림<small>쪽 모양이 아니라 글 흐름으로 · 글상자 자리는 다를 수 있음</small></dd>
+  <dt>워드</dt><dd><span class="점 됨"></span>DOCX · DOC<small>글 흐름으로 · 옛 DOC 는 글자 위주</small></dd>
+  <dt>엑셀</dt><dd><span class="점 됨"></span>XLSX · XLS · 시트마다 · 칸 너비 그대로<small>계산식은 저장된 값으로 · 암호 엑셀은 못 엶</small></dd>
+  <dt>PPT</dt><dd><span class="점 됨"></span>PPTX 장 모양대로 · 「글로」 단추<small><span class="점 일부"></span>옛 PPT 는 글자만 · 차트 · 스마트아트 빠짐</small></dd>
+  <dt>그림</dt><dd><span class="점 됨"></span>JPG · PNG · HEIC · GIF · WEBP · BMP</dd>
+  <dt>도면</dt><dd><span class="점 됨"></span>DXF · 레이어 · 길이 재기<small class="못"><span class="점 안됨"></span>DWG 는 못 엶 → PDF · DXF 로 받기</small></dd>
+  <dt>압축</dt><dd><span class="점 됨"></span>ZIP — 풀지 않고 안을 봄 · 옛 방식 암호<small class="못"><span class="점 안됨"></span>알집(ALZ · EGG) · 7Z · RAR 못 엶</small></dd>
+  <dt>HTML</dt><dd><span class="점 됨"></span>글 · 표 · 급여명세서 같은 암호 HTML<small>프로그램이 든 HTML 은 인터넷을 막고 엶</small></dd>
+  <dt>글</dt><dd><span class="점 됨"></span>TXT</dd>
+  <dt style="border:0">영상</dt><dd style="border:0"><span class="점 일부"></span>보기 아님 → 「🎬 영상 → 클로드」 로 보냄</dd>
+</dl>
+</section>
+
+<section id="core">
+<h2><b>★</b>핵심 기능 한눈에</h2>
+<div class="기능">
+  <a href="#pen"><b>✏️ 펜 · 형광 · 메모</b><small>문서 위 표시 · 원본 그대로</small></a>
+  <a href="#shape"><b>⬚ 도형 · 글</b><small>화살표 · 네모 · 동그라미</small></a>
+  <a href="#stamp"><b>🔴 도장 · 서명</b><small>검토필 날짜 이름 · 손 서명</small></a>
+  <a href="#copy"><b>✂️ 골라 복사</b><small>필요한 곳만 잘라 붙여넣기</small></a>
+  <a href="#share"><b>⇪ 보내기</b><small>표시 입힌 사본 · 카톡 · 메일</small></a>
+  <a href="#find"><b>⌕ 찾기</b><small>문서 안 · 모든 문서에서</small></a>
+  <a href="#measure"><b>📏 축척 재기</b><small>도면 PDF · 그림 길이</small></a>
+  <a href="#compare"><b>⇄ 두 판 견주기</b><small>고치기 전 · 후 달라진 곳</small></a>
+  <a href="#bookmark"><b>🔖 책갈피 · ⭐</b><small>보던 쪽 그대로 다시 열림</small></a>
+  <a href="#topdf"><b>📄 사진 → PDF</b><small>여러 장을 한 권으로</small></a>
+</div>
+</section>
+
+<section id="s1">
+<h2><b>1</b>처음 — 설치 · 문서 열기</h2>
+<h3>설치 (한 번만)</h3>
+<div class="카드">
+  <b>갤럭시</b>
+  <ol class="누름"><li>카톡 안내의 <span class="단">…/docview.apk</span> 주소 누름 → 받기 → 설치</li>
+  <li>「출처를 알 수 없는 앱」 → <span class="단">이 출처 허용</span> → 뒤로 → 설치</li>
+  <li>「안전하지 않은 앱」 → 자세히 → <span class="단">그래도 설치</span></li></ol>
+  <span class="흐림">새 판 → 같은 주소에서 다시 설치 (문서 · 표시 그대로)</span>
+</div>
+<div class="카드">
+  <b>아이폰</b>
+  <ol class="누름"><li>카톡 안내의 <span class="단">cheaman.github.io/docview</span> 누름 → 사파리로 열림</li>
+  <li>⋯ → <span class="단">공유</span> → <span class="단">홈 화면에 추가</span> → 추가</li>
+  <li>홈 화면 「문서 보기」 → 완전히 닫고 한 번 더 열기</li></ol>
+  <span class="흐림">새 판 → 저절로 바뀜</span>
+</div>
+<h3>문서 열기</h3>
+<ol class="누름">
+  <li><b>갤럭시</b> — 카톡에서 문서 누름 → <span class="단">다른 앱으로 열기</span> → 문서 보기</li>
+  <li><b>아이폰</b> — 카톡 문서 → 공유 → <span class="단">파일에 저장</span> → 앱 <span class="단">파일 열기</span> → 고름</li>
+  <li>한 번 연 문서는 첫 화면 목록에 남음 → 다음엔 목록에서 바로</li>
+</ol>
+<figure><img src="help/list.jpg" alt="첫 화면 목록" loading="lazy"><figcaption>첫 화면 — 형식 칩 · 목록 · 아래 「파일 열기」</figcaption></figure>
+</section>
+
+<section id="s2">
+<h2><b>2</b>보기 — 확대 · 쪽 · 찾기 · 밤</h2>
+<figure><img src="help/pdf.jpg" alt="PDF 보기" loading="lazy"><figcaption>PDF 보기 — 아래 도구 줄</figcaption></figure>
+<ol class="누름">
+  <li><b>확대</b> — 두 손가락으로 벌리기 · 두 번 톡 = 크게 ↔ 원래</li>
+  <li><b>한글 · 워드 · 엑셀</b> — 두 손가락으로 벌리면 글씨가 커짐 · 「글씨」 단추로도</li>
+  <li><b>쪽 목록</b> — 쪽 그림을 보고 톡 → 그 쪽으로 · 칩 「🔖 · 목차 · 표시」</li>
+  <li><b>돌리기</b> — 단추 · 두 손가락 비틀기</li>
+</ol>
+<figure id="find"><img src="help/find.jpg" alt="찾기" loading="lazy"><figcaption>찾기 — 찾은 곳 칠함 · ∧ ∨ 로 옮김</figcaption></figure>
+<div class="알아둘것"><b>저절로 되는 것</b>다시 열면 보던 쪽 · 확대 그대로 · 밤(해 진 뒤)엔 바탕이 어두워짐 → 머리 🌙 로 이 문서만 끄기 · 보는 동안 화면 안 꺼짐</div>
+<h3 id="bookmark">🔖 책갈피 · ⭐ 즐겨찾기</h3>
+<ol class="누름">
+  <li>문서 머리 🔖 → 이 쪽에 책갈피 · 쪽 목록 「🔖」 칩으로 모아 보기</li>
+  <li>목록에서 길게 눌러 고르기 → <span class="단">⭐ 즐겨찾기</span> → 목록 맨 위에 고정</li>
+</ol>
+</section>
+
+<section id="s3">
+<h2><b>3</b>표시 — 펜 · 도형 · 도장</h2>
+<figure id="pen"><img src="help/pen.jpg" alt="펜" loading="lazy"><figcaption>펜 판 — 펜 · 형광 · 메모 · 도형 · 도장</figcaption></figure>
+<ol class="누름">
+  <li>아래 줄 <span class="단">펜</span> → 위에 펜 판</li>
+  <li><b>펜</b> 한 손가락 긋기 · <b>형광</b> 곧게 펴짐 · 두 손가락은 밀기</li>
+  <li><b>메모</b> → 톡한 자리에 번호 메모</li>
+  <li>되돌리기 ↶ · 지우개</li>
+</ol>
+<h3 id="shape">도형 · 글</h3>
+<ol class="누름"><li>펜 판 <span class="단">도형</span> → 화살표 · 네모 · 동그라미 · 글</li><li>끌어 그림 → 반듯하게 · 그린 것 톡 = 고르기 → 끌어 옮김 · 끝 동그라미 = 크기</li></ol>
+<h3 id="stamp">도장 · 서명</h3>
+<ol class="누름"><li>펜 판 <span class="단">도장</span> → 「검토필」 등 고름 → 찍을 곳 톡</li><li>처음 한 번 이름을 물어봄 (이 폰에만 저장) · <span class="단">＋</span> 에서 도장 글 · 손 서명</li></ol>
+<div class="알아둘것"><b>원본은 안 바뀜</b>표시는 따로 저장 → 보낼 때만 사본에 입힘 · 도장은 보기 표시 (전자서명 아님)</div>
+</section>
+
+<section id="s4">
+<h2><b>4</b>내보내기 — 보내기 · 골라 복사</h2>
+<h3 id="share">⇪ 보내기</h3>
+<figure><img src="help/share.jpg" alt="보내기" loading="lazy"><figcaption>보내기 판 — 사본 · 지금 쪽만 · 원본</figcaption></figure>
+<ol class="누름"><li>아래 줄 <span class="단">보내기</span> → 무엇을 보낼지 고름</li><li>카톡 · 메일 고르는 창 → 보낼 곳</li></ol>
+<h3 id="copy">✂️ 골라 복사</h3>
+<figure><img src="help/copy.jpg" alt="골라 복사" loading="lazy"><figcaption>틀 — 귀 넷 = 크기 · 안 = 옮김 · 밖 = 새로 그림</figcaption></figure>
+<ol class="누름"><li>아래 줄 <span class="단">복사</span> → 틀 뜸</li><li>필요한 곳을 손가락으로 그림</li><li><span class="단">📋 복사</span> → 카톡 입력칸 길게 → 붙여넣기 · 또는 <span class="단">⇪ 보내기</span> 그림 파일</li></ol>
+<h3 id="topdf">📄 사진 여러 장 → PDF 한 권</h3>
+<ol class="누름"><li>목록에서 사진을 길게 눌러 고르기 → 여러 장 톡</li><li>아래 <span class="단">📄 PDF 로</span> → 차례 끌어 바꿈 → 만들기</li></ol>
+</section>
+
+<section id="s5">
+<h2><b>5</b>현장 — 축척 재기 · 두 판 견주기 · 도면</h2>
+<h3 id="measure">📏 축척 재기</h3>
+<figure><img src="help/measure.jpg" alt="축척 재기" loading="lazy"><figcaption>축척 — 도면 글의 S=1:100 을 찾아 미리 고름</figcaption></figure>
+<ol class="누름"><li>PDF · 그림에서 아래 줄 <span class="단">재기</span> → 축척 고름 (또는 「아는 치수로 맞추기」)</li><li>두 점 톡 → 실제 길이</li><li><span class="단">남기기</span> → 펜 표시로 남음</li></ol>
+<h3 id="compare">⇄ 두 판 견주기</h3>
+<ol class="누름"><li>목록에서 PDF · PPT 둘을 길게 눌러 고르기</li><li>아래 <span class="단">⇄ 견주기</span> → 같음 검정 · 앞에만 빨강 · 뒤에만 파랑</li><li>⌃⌄ 달라진 쪽만 옮겨 다님</li></ol>
+<figure><img src="help/compare.jpg" alt="두 판 견주기" loading="lazy"><figcaption>고친 판과 견주기 — 바뀐 숫자가 색으로</figcaption></figure>
+<h3>도면 (DXF)</h3>
+<figure><img src="help/cad.jpg" alt="도면" loading="lazy"><figcaption>도면 — 두 손가락 확대 · 레이어 · 재기</figcaption></figure>
+</section>
+
+<section id="s6">
+<h2><b>6</b>정리 — 고르기 · 묶음 · ⭐ · 전체 찾기</h2>
+<figure><img src="help/select.jpg" alt="고르기" loading="lazy"><figcaption>고르기 — 아래 줄에서 한꺼번에</figcaption></figure>
+<ol class="누름">
+  <li>머리 <span class="단">고르기</span> · 또는 목록 줄 길게 누름 → 동그라미를 문질러 여러 개</li>
+  <li>아래 줄 → ⭐ 즐겨찾기 · 🏷 묶음 · 지우기 (원본은 그대로 · 앱 안 사본만)</li>
+  <li>머리 칩 → PDF · 한글 · 엑셀 … 형식별로 · 「묶음」 = 과업별 이름표</li>
+</ol>
+<h3>⌕ 전체 찾기</h3>
+<ol class="누름"><li>첫 화면 머리 ⌕ → 「이름에서」 · 「문서 속에서」</li><li>찾은 줄 톡 → 그 문서 · 그 쪽으로</li></ol>
+</section>
+
+<section id="s7">
+<h2><b>7</b>문서마다</h2>
+<h3>한글 · 워드 — 글씨 크게</h3>
+<figure><img src="help/word.jpg" alt="워드" loading="lazy"><figcaption>두 손가락 벌리기 → 글씨 크기 (아래 「글씨 18」)</figcaption></figure>
+<ol class="누름"><li>두 손가락으로 벌리면 커짐 · 오므리면 작아짐</li><li>「글씨」 단추 → 크기 · 줄 간격 · 글꼴 · 바탕</li><li>모양이 어긋나면 「글자만」 → 글만 깔끔히</li></ol>
+<h3>엑셀 — 컴퓨터 화면처럼</h3>
+<figure><img src="help/excel.jpg" alt="엑셀" loading="lazy"><figcaption>칸 너비 그대로 · A B C · 1 2 3 고정</figcaption></figure>
+<ol class="누름"><li>위 칩 = 시트 · 표 안에서 위아래 · 옆으로 밀기</li><li>두 손가락으로 오므리면 더 많은 칸이 보임</li></ol>
+<h3>🔒 암호 PDF</h3>
+<figure><img src="help/password.jpg" alt="암호 PDF" loading="lazy"><figcaption>암호 칸 — 틀리면 다시 물음</figcaption></figure>
+<ol class="누름"><li>암호 걸린 PDF 를 열면 암호 칸이 뜸 → 넣고 <span class="단">열기</span></li><li>암호는 폰에 저장 안 함 → 앱을 닫으면 다시 물음</li></ol>
+<div class="알아둘것"><b>갤럭시 안드로이드 14 이하</b>암호 PDF 는 아직 못 엶 → 설정 › 휴대전화 정보 › 소프트웨어 정보 에서 판 확인</div>
+<h3>급여명세서 같은 암호 HTML</h3>
+<figure><img src="help/secure.jpg" alt="보안메일" loading="lazy"><figcaption>생년월일 칸 옆 「확인」 · 위 − ＋ 로 크기</figcaption></figure>
+<ol class="누름"><li>그 파일을 열면 앱 안 막힌 칸에서 엶 (인터넷 막음)</li><li>생년월일 등 넣고 <span class="단">확인</span></li><li>글씨가 작으면 위 띠 <span class="단">＋</span></li></ol>
+<h3>ZIP</h3>
+<ol class="누름"><li>풀지 않고 눌러서 안의 파일을 바로 봄 · 뒤로 = 한 칸씩</li><li>꺼낸 파일은 목록에 「압축 · ZIP 이름」 으로 남음</li></ol>
+</section>
+
+<section id="faq">
+<h2><b>?</b>안 될 때 · 자주 묻는 것</h2>
+<div class="카드"><b>카톡에서 「다른 앱으로 열기」 에 문서 보기가 없음</b><br><span class="흐림">카톡 → 파일 길게 → ⋮ → 다른 앱으로 열기 · 처음 한 번 「항상」 말고 「한 번만」</span></div>
+<div class="카드"><b>표시 · 목록이 사라짐</b><br><span class="흐림">앱을 지우면 앱 안 문서 · 표시도 지워짐 → 새 판은 지우지 말고 덮어 설치</span></div>
+<div class="카드"><b>붙여넣기가 안 됨</b><br><span class="흐림">붙여넣는 앱마다 다름 → 「⇪ 보내기」 로 그림 파일</span></div>
+<div class="카드"><b>한글 모양이 원본과 다름</b><br><span class="흐림">글 흐름으로 보여 줌 (쪽 모양 아님) → 쪽 모양이 꼭 필요하면 PDF 로 받기</span></div>
+<div class="카드"><b>그래도 안 되면</b><br><span class="흐림">화면을 찍어 나눠 준 분에게 카톡 — 어떤 문서 · 갤럭시/아이폰 한 줄 같이</span></div>
+</section>
+
+<div class="서명">DSM · 34 문서보기 · 쓰는 법</div>
+</main>
+<script>
+// 돌아가기 — 앱에서 열었으면 뒤로 (보던 화면 그대로) · 주소로 바로 열었으면 첫 화면
+document.getElementById('뒤').addEventListener('click', e => { if (history.length > 1 && document.referrer) { e.preventDefault(); history.back(); } });
+// 쪽 안 이동(차례 · 기능 칸)은 기록을 안 남김 — 남기면 뒤로 · 돌아가기가 첫 화면이 아니라 쓰는 법 맨 위로 감
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[href^="#"]'); if (!a) return;
+  const 곳 = document.getElementById(a.getAttribute('href').slice(1)); if (!곳) return;
+  e.preventDefault(); 곳.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+try { const v = window.Android?.version?.(); if (v) document.getElementById('판').textContent = 'v' + String(v).split(' · ')[0]; } catch (e) {}
+try { localStorage.setItem('쓰는법봄', '1'); } catch (e) {}
+</script>
+</body>
+</html>
