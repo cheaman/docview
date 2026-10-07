@@ -88,7 +88,21 @@ function 꼬리표들(b) {                       // [{태그, 깊이, 몸}] — 
 }
 const 몸보기 = 몸 => new DataView(몸.buffer, 몸.byteOffset, 몸.byteLength);
 const 컨트롤이름 = 몸 => { if (몸.length < 4) return ''; const x = 몸보기(몸).getUint32(0, true); return String.fromCharCode((x >>> 24) & 255, (x >>> 16) & 255, (x >>> 8) & 255, x & 255); };
-const 태그 = { 바이너리: 18, 글자모양: 21, 문단모양: 25, 문단머리: 66, 문단글: 67, 문단글자모양: 68, 컨트롤머리: 71, 목록머리: 72, 표: 77, OLE: 84, 그림: 85 };
+const 태그 = { 바이너리: 18, 글자모양: 21, 문단모양: 25, 문단머리: 66, 문단글: 67, 문단글자모양: 68, 컨트롤머리: 71, 목록머리: 72, 쪽설정: 73, 개체요소: 76, 표: 77, OLE: 84, 그림: 85 };
+// 묶음 개체 자리 (10-07 전무님 「그림들이 쪼개서 각각 자리를 차지」) — 개체요소(76) 의 행렬 : [이동, (크기 · 회전) × n] 을 곱함 · 칸 [a,b,c,d,e,f] = x'=ax+by+c · y'=dx+ey+f
+const 행렬곱 = (P, Q) => [P[0] * Q[0] + P[1] * Q[3], P[0] * Q[1] + P[1] * Q[4], P[0] * Q[2] + P[1] * Q[5] + P[2], P[3] * Q[0] + P[4] * Q[3], P[3] * Q[1] + P[4] * Q[4], P[3] * Q[2] + P[4] * Q[5] + P[5]];
+function 개체요소읽기(몸, 맨위) {                           // 맨 위 개체는 컨트롤 ID 가 두 번 · 처음 크기 · 행렬 곱 · 이름($pic $rec $con …)
+  const q = 맨위 ? 8 : 4, v = 몸보기(몸);
+  if (몸.length < q + 44) return null;
+  const 이름 = String.fromCharCode(몸[3], 몸[2], 몸[1], 몸[0]);
+  const w0 = v.getUint32(q + 12, true), h0 = v.getUint32(q + 16, true), n = v.getUint16(q + 42, true);
+  let M = [1, 0, 0, 0, 1, 0];
+  for (let j = 0; j < 1 + 2 * n; j++) {
+    const o = q + 44 + 48 * j; if (o + 48 > 몸.length) break;
+    M = 행렬곱(M, [0, 1, 2, 3, 4, 5].map(k => v.getFloat64(o + 8 * k, true)));
+  }
+  return { 이름, w0, h0, M };
+}
 
 문서.hwp = async function (buf, 덧) {
   const u8 = new Uint8Array(buf);
@@ -131,6 +145,10 @@ const 태그 = { 바이너리: 18, 글자모양: 21, 문단모양: 25, 문단머
   for (const 구역 of 구역들) {
     const rs = 꼬리표들(await 읽기(구역));
     let i = 0;
+    // 본문폭 (HWPUNIT) — 쪽 설정 : 너비 · 높이 · 왼 · 오른 여백 · … · 36바이트 성질 1비트 = 가로 쪽 (10-07 · 떠 있는 그림을 나란히 놓을 때 폭 비율)
+    let 본문폭 = 0;
+    { const 쪽 = rs.find(r => r.태그 === 태그.쪽설정 && r.몸.length >= 40);
+      if (쪽) { const v = 몸보기(쪽.몸), 가로쪽 = v.getUint32(36, true) & 1; 본문폭 = (가로쪽 ? v.getUint32(4, true) : v.getUint32(0, true)) - v.getUint32(8, true) - v.getUint32(12, true) - v.getUint32(32, true); } }
     const 문단들 = (담을곳, 깊이, 개수) => {      // 깊이가 같은 문단머리를 개수만큼 (개수 없으면 깊이가 얕아질 때까지)
       let 몇 = 0;
       while (i < rs.length && rs[i].깊이 >= 깊이 && (개수 == null || 몇 < 개수)) {
@@ -194,6 +212,14 @@ const 태그 = { 바이너리: 18, 글자모양: 21, 문단모양: 25, 문단머
         붓기(n);
       }
       while (컨트롤자리 < 컨트롤.length) { const 덩이 = 컨트롤[컨트롤자리++]; if (덩이) 담을곳.append(덩이.el); }
+      // 같은 문단에 붙은 떠 있는 그림이 둘 이상이고 폭 합이 본문폭 안 → 한글처럼 한 줄에 나란히 (10-07 회의 문서 「그림들이 쪼개서 각각 자리를 차지」 · 2×2 그래프)
+      const 떠들 = 컨트롤.filter(c => c?.el?.dataset?.떠).map(c => c.el);
+      const 폭합 = 떠들.reduce((a, e) => a + +e.dataset.폭, 0);
+      if (떠들.length > 1 && 폭합 <= 104) {
+        const 줄 = 만들기('div', '그림줄'); 떠들[0].before(줄);
+        떠들.sort((a, b) => a.dataset.가 - b.dataset.가).forEach(e => { e.style.width = Math.min(100, +e.dataset.폭) + '%'; const im = e.querySelector('img'); if (im) im.style.width = '100%'; 줄.append(e); });
+        if (폭합 < 80) 줄.style.justifyContent = 'flex-start';           // 폭이 넉넉히 남으면 왼쪽부터 · 아니면 양 끝 (한글의 두 장 가로 0 · 536 꼴)
+      }
       if (!p.textContent.trim() && !p.querySelector('br,img,span.빈그림')) p.classList.add('빈줄');
     };
     const 컨트롤읽기 = 깊이 => {                    // rs[i] 가 컨트롤머리
@@ -202,17 +228,53 @@ const 태그 = { 바이너리: 18, 글자모양: 21, 문단모양: 25, 문단머
       if (이름 === 'gso ') {                         // 그리기 개체 — 글상자면 글을, 그림 · OLE 면 그림을 (BinData 에서 · 10-05)
         const 상자 = 만들기('div', '글상자');
         const 그림들 = [];                              // 바이너리 번호 (1부터) — 묶음 개체는 여러 장
+        const 조각들 = [];                              // 개체요소 차례 (10-07) — { 이름, 깊이, w0, h0, M(맨 위 묶음 좌표로), 그림, 상자 }
+        const 주인 = d => { for (let k = 조각들.length - 1; k >= 0; k--) if (조각들[k].깊이 < d) return 조각들[k]; return null; };
         while (i < rs.length && rs[i].깊이 > 깊이) {
           const r = rs[i];
-          if (r.태그 === 태그.목록머리) { const 수 = 몸보기(r.몸).getInt16(0, true); const d = r.깊이; i++; 문단들(상자, d, 수); continue; }
-          if (r.태그 === 태그.그림) 그림들.push(r.몸.length >= 73 ? 몸보기(r.몸).getUint16(71, true) : -1);   // 테두리 · 네 점 · 자르기 · 여백 · 밝기 · 명암 · 효과 뒤
-          else if (r.태그 === 태그.OLE) 그림들.push(r.몸.length >= 14 ? 몸보기(r.몸).getUint16(12, true) : -1);
+          if (r.태그 === 태그.개체요소) {
+            const 요 = 개체요소읽기(r.몸, r.깊이 === 깊이 + 1);
+            if (요) { const 위 = 주인(r.깊이); 조각들.push({ ...요, 깊이: r.깊이, M: 위 ? 행렬곱(위.M, 요.M) : [1, 0, 0, 0, 1, 0] }); }   // 맨 위(묶음 자신)는 기준 좌표
+            i++; continue;
+          }
+          if (r.태그 === 태그.목록머리) {
+            const 수 = 몸보기(r.몸).getInt16(0, true), d = r.깊이, 조 = 주인(d);
+            if (조 && 조.깊이 > 깊이 + 1) { 조.상자 = 만들기('div', '글상자'); i++; 문단들(조.상자, d, 수); continue; }   // 묶음 안 글상자 — 제 조각에
+            i++; 문단들(상자, d, 수); continue;
+          }
+          let 번호 = null;
+          if (r.태그 === 태그.그림) 번호 = r.몸.length >= 73 ? 몸보기(r.몸).getUint16(71, true) : -1;   // 테두리 · 네 점 · 자르기 · 여백 · 밝기 · 명암 · 효과 뒤
+          else if (r.태그 === 태그.OLE) 번호 = r.몸.length >= 14 ? 몸보기(r.몸).getUint16(12, true) : -1;
+          if (번호 != null) { 그림들.push(번호); const 조 = 주인(r.깊이); if (조) 조.그림 = 번호; }
           i++;
+        }
+        const 새그림 = 번호 => { const img = 만들기('img', '그림 채우는중'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; 할그림.push({ img, 번호 }); return img; };
+        // 묶음($con) — 조각을 제자리에 겹쳐 놓음 (10-07) · 묶음 크기 비율의 칸 안에 백분율로 · 글상자 글씨는 묶음 너비 따라 (cqw)
+        if (조각들[0]?.이름 === '$con' && 조각들[0].w0 > 0 && 조각들[0].h0 > 0) {
+          const W = 조각들[0].w0, H = 조각들[0].h0, 잎 = 조각들.slice(1).filter(c => c.그림 != null || c.상자?.textContent.trim());
+          if (잎.length) {
+            const mv = 머리.length >= 24 ? 몸보기(머리) : null;
+            const 너비px = mv ? Math.round(mv.getUint32(16, true) / 75) : Math.round(W / 75);
+            const 틀 = 만들기('div', '묶음그림');
+            틀.style.aspectRatio = `${W} / ${H}`; if (너비px > 0 && 너비px < 5000) 틀.style.maxWidth = 너비px + 'px';
+            틀.style.setProperty('--묶음글', (13.33 / (W / 75) * 100).toFixed(3) + 'cqw');   // 10pt 를 묶음 원래 너비에 견줘
+            for (const c of 잎) {
+              const 점 = [[0, 0], [c.w0, 0], [0, c.h0], [c.w0, c.h0]].map(([x, y]) => [c.M[0] * x + c.M[1] * y + c.M[2], c.M[3] * x + c.M[4] * y + c.M[5]]);
+              const x0 = Math.min(...점.map(p => p[0])), x1 = Math.max(...점.map(p => p[0])), y0 = Math.min(...점.map(p => p[1])), y1 = Math.max(...점.map(p => p[1]));
+              if (!(x1 > x0 && y1 > y0)) continue;
+              const 칸 = 만들기('div', '묶음조각');
+              Object.assign(칸.style, { left: (x0 / W * 100).toFixed(3) + '%', top: (y0 / H * 100).toFixed(3) + '%', width: ((x1 - x0) / W * 100).toFixed(3) + '%', height: ((y1 - y0) / H * 100).toFixed(3) + '%' });
+              if (c.그림 != null) 칸.append(새그림(c.그림));
+              if (c.상자?.textContent.trim()) { 칸.classList.add('묶음글'); 칸.append(c.상자); }
+              틀.append(칸);
+            }
+            if (상자.textContent.trim()) { const 감 = 만들기('div', '그림틀'); 감.append(틀, 상자); return { el: 감 }; }   // 묶음 캡션
+            return { el: 틀 };
+          }
         }
         const 글있음 = !!상자.textContent.trim();
         if (!그림들.length) return 글있음 ? { el: 상자 } : null;
-        const 새그림 = 번호 => { const img = 만들기('img', '그림 채우는중'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; 할그림.push({ img, 번호 }); return img; };
-        if (그림들.length > 1 || 글있음) {              // 묶음 (그림 여러 장 · 그림 + 설명 글상자) — 자리는 못 맞추고 차례로 늘어놓음
+        if (그림들.length > 1 || 글있음) {              // 묶음 아닌 여러 장 · 그림 + 캡션 — 차례로 늘어놓음
           const 틀 = 만들기('div', '그림틀');
           for (const 번호 of 그림들) 틀.append(새그림(번호));
           if (글있음) 틀.append(상자);
@@ -226,7 +288,9 @@ const 태그 = { 바이너리: 18, 글자모양: 21, 문단모양: 25, 문단머
         if (너비 > 0 && 너비 < 5000) img.style.width = 너비 + 'px';
         if (너비 > 0 && 높이 > 0 && 높이 < 5000) img.style.aspectRatio = `auto ${너비} / ${높이}`;   // 채우기 전에도 자리를 잡아 화면이 안 밀림
         if (글자처럼) return { el: img, 인라인: true };
-        const 틀 = 만들기('div', '그림틀'); 틀.append(img); return { el: 틀 };
+        const 틀 = 만들기('div', '그림틀'); 틀.append(img);
+        if (mv && 본문폭 > 0) { 틀.dataset.떠 = '1'; 틀.dataset.가 = mv.getInt32(12, true); 틀.dataset.폭 = (mv.getUint32(16, true) / 본문폭 * 100).toFixed(2); }   // 같은 문단 떠 있는 그림 나란히 (문단 끝에서)
+        return { el: 틀 };
       }
       // 머리말 · 꼬리말 · 각주 · 쪽 번호 · 책갈피 등 — 본문에 안 보임
       while (i < rs.length && rs[i].깊이 > 깊이) i++;
@@ -253,6 +317,13 @@ const 태그 = { 바이너리: 18, 글자모양: 21, 문단모양: 25, 문단머
       const w = 만들기('div', '표틀'); w.append(t); return w;
     };
     문단들(틀, 0);
+  }
+  // 떠 있는 그림 뒤 빈 줄 거두기 (10-07) — 한글은 떠 있는 그림 밑 자리를 빈 줄로 잡아 둠 · 여기선 그림이 제 자리를 차지하므로 빈 줄이 큰 틈이 됨
+  const 빈문단 = n => n && n.tagName === 'P' && !n.textContent.trim() && !n.querySelector('img,.빈그림');   // 「빈줄」 표시가 없는 빈 문단(컨트롤 뒤 새 p)도
+  for (const e of 틀.querySelectorAll('.그림줄, .그림틀[data-떠]')) {
+    let n = e.nextElementSibling;
+    while (빈문단(n)) { const 다음 = n.nextElementSibling; n.remove(); n = 다음; }
+    const 앞 = e.previousElementSibling; if (빈문단(앞)) 앞.remove();
   }
   // 그림 꺼내기 — 글을 먼저 보이고, 화면 앞뒤 2000화소 안에 온 그림만 하나씩 (10-05 실측 : 그림 267장 문서를 통째로 그리면 PC 에서도 1분 넘음)
   //   같은 그림을 여러 번 쓰면 한 번만 · 글만 뽑을 때(전체 찾기)는 안 꺼냄 · 닫은 문서(틀이 빠짐)는 더 안 그림

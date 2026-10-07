@@ -106,6 +106,19 @@ button { font:inherit; color:inherit; background:none; border:0; padding:0; curs
 .flowin table { border-collapse:collapse; font-size:.86em; line-height:1.45; min-width:60%; }
 .flowin td { border:1px solid var(--rule); padding:.35em .5em; vertical-align:top; min-width:3.6em; }
 .flowin td p { margin:0; }
+/* 한글 같은 문단 떠 있는 그림 나란히 (10-07 · 2×2 그래프) */
+.flowin .그림줄 { display:flex; justify-content:space-between; align-items:flex-start; gap:0 1%; margin:.6em 0; }
+.flowin .그림줄 > .그림틀 { margin:0; flex:none; }
+/* 한글 묶음 그림 (10-07) — 조각을 제자리에 겹침 · 글상자 글씨는 묶음 너비 따라 */
+.flowin .묶음그림 { position:relative; width:100%; margin:.6em auto; container-type:inline-size; overflow:hidden; }
+.flowin .묶음조각 { position:absolute; }
+.flowin .묶음조각 > img { display:block; width:100%; height:100%; max-width:none; object-fit:fill; margin:0; aspect-ratio:auto; }
+.flowin .묶음글 { display:flex; flex-direction:column; justify-content:center; font-size:var(--묶음글, 1em); line-height:1.25; }
+.flowin .묶음글 .글상자 { margin:0; padding:0; border:0; background:none; }
+.flowin .묶음글 p { margin:0; }
+/* 표 칸은 낱말 통째로 (10-07 전무님 갤럭시 화면 「건축전기 / 부」 · 「340,75 / 8」) — 위 .flowin 의 overflow-wrap:anywhere 가 열을 낱말보다 좁게 줄여 중간에서 꺾음
+   → break-word 는 열 너비 셈에 안 끼어 열이 가장 긴 낱말만큼 넓어짐 · 넘치면 .표틀 옆 밀기 */
+.flowin td { overflow-wrap:break-word; }
 .flowin .그림 { max-width:100%; height:auto; display:inline-block; vertical-align:middle; }
 .flowin .빈그림 { color:var(--sub); font-size:.85em; }
 .flowin .그림틀 { text-align:center; margin:.4em 0; }   /* 옛 한글 — 글자처럼 취급 안 한 그림 · 묶음 (10-05) */
