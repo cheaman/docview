@@ -67,6 +67,9 @@ video{width:100%;max-height:46vh;background:#000;border-radius:12px}
 .요약{font-size:13px;color:var(--dim);display:flex;justify-content:space-between}
 .미리판{display:flex;gap:6px;overflow-x:auto}
 .미리판 img{height:150px;border-radius:6px}
+/* 복사해서 붙여 넣기 (10-10) — 공유 창이 안 뜰 때의 다른 길 · 한 번에 하나씩 */
+.복사줄{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
+.복사줄 button{font:inherit;font-size:13px;border:1px solid var(--line,#d1d1d6);background:transparent;color:inherit;border-radius:999px;padding:5px 11px;color:var(--fg,inherit)}
 /* 4 내용 문서 */
 .문서{background:var(--bg);border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.7;max-height:42vh;overflow:auto}
 .문서 h1,.문서 h2,.문서 h3{margin:6px 0 2px;font-size:16px}

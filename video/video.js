@@ -139,6 +139,14 @@ function 둥근네모(x, 왼, 위, 폭, 높, r) {
 영상.파일로 = (c, 이름, 질 = 0.88) => new Promise((ok, no) =>
   c.toBlob(b => b ? ok(new File([b], 이름, { type: 'image/jpeg' })) : no(new Error('그림 파일을 못 만듦')), 'image/jpeg', 질));
 
+// 캔버스 → 갤럭시 앱으로 넘길 그림 (10-10 · 34번 폰 실물) — toBlob · arrayBuffer 를 거치지 않고 바로 base64
+//   폰 WebView 에서 「클로드에게 보내기」 가 「그림 만드는 중 …」 에서 멈춤 → 답을 안 주는 비동기 단계를 아예 뺌
+//   (미리보기 장면판은 같은 toDataURL 로 잘 그려짐)
+영상.앱그림 = (c, 이름, 질 = 0.88) => ({ name: 이름, type: 'image/jpeg', b64: c.toDataURL('image/jpeg', 질).split(',')[1] });
+
+// 약속이 ms 안에 안 끝나면 «어디서 멈췄나» 오류로 — 말없이 멈추지 않게
+영상.제한 = (약속, ms, 자리) => Promise.race([약속, new Promise((_, no) => setTimeout(() => no(new Error(`${자리}에서 멈춤 (${ms / 1000}초)`)), ms))]);
+
 // ④ 함께 갈 글 — 장면판과 함께 클로드에게 가는 글
 영상.함께갈글 = function ({ 출처 = '영상', 길이 = 0, 장수 = 0, 낱장 = false, 물음 = '' }) {
   const 줄1 = `${출처} · ${영상.시각(길이)} · 장면 ${장수}`;
@@ -235,9 +243,9 @@ const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = 
 // ⑥ 보내기 ───────────────────────────────────────────────
 // 폰 : 공유 창(카톡 · 클로드 · 메모 …) · PC : 내려받기 + 글은 복사해 둠
 // 34번에 넣을 때 : 껍데기에 «여러 파일 공유» 다리(shareFiles)를 더하면 그 길을 먼저 탐
-영상.보내기 = async function (파일들, 글) {
+영상.보내기 = async function (파일들, 글, 알림 = () => {}) {
   const 앱 = window.Android;
-  if (앱 && 앱.shareMultiBegin) { await 영상.앱으로(앱, 파일들, 글); return '공유'; }
+  if (앱 && 앱.shareMultiBegin) { await 영상.앱으로(앱, 파일들, 글, 알림); return '공유'; }
   if (navigator.canShare && navigator.canShare({ files: 파일들 })) {
     await navigator.share(글 ? { files: 파일들, text: 글 } : { files: 파일들 });
     return '공유';
@@ -253,19 +261,27 @@ const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = 
 
 // 갤럭시 문서보기 앱 안 — 다리로는 글자만 오가므로 파일마다 base64 조각(384KB)으로 넘기고, 껍데기가 공유 창을 띄움
 //   shareMultiBegin() → [shareMultiFile(이름) → shareChunk(조각)…] × 파일 수 → shareMultiEnd(꼴, 글)
-영상.앱으로 = async function (앱, 파일들, 글) {
+//   파일들 = File(md · docx) 또는 영상.앱그림 꼴 {name, type, b64}(장면 그림) — b64 가 있으면 그대로 조각내 넘김
+영상.앱으로 = async function (앱, 파일들, 글, 알림 = () => {}) {
   if (!앱.shareMultiBegin()) throw new Error('보낼 파일을 못 만듦');
-  const 크기 = 393216;
-  for (const f of 파일들) {
+  const 크기 = 393216, 글크기 = 크기 / 3 * 4;          // base64 조각은 4글자 배수라야 따로따로 풀림 (524288)
+  for (const [n, f] of 파일들.entries()) {
+    알림(`앱에 넘기는 중 ${n + 1}/${파일들.length}`);
     if (!앱.shareMultiFile(f.name)) throw new Error('보낼 파일을 못 만듦');
-    const b = new Uint8Array(await f.arrayBuffer());
-    for (let i = 0; i < b.length; i += 크기) {
-      const 덩 = b.subarray(i, i + 크기); let s = '';
-      for (let k = 0; k < 덩.length; k += 8192) s += String.fromCharCode.apply(null, 덩.subarray(k, k + 8192));
-      if (!앱.shareChunk(btoa(s))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+    if (f.b64) {
+      for (let i = 0; i < f.b64.length; i += 글크기)
+        if (!앱.shareChunk(f.b64.slice(i, i + 글크기))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+    } else {
+      const b = new Uint8Array(await 영상.제한(f.arrayBuffer(), 15000, `${f.name} 읽기`));
+      for (let i = 0; i < b.length; i += 크기) {
+        const 덩 = b.subarray(i, i + 크기); let s = '';
+        for (let k = 0; k < 덩.length; k += 8192) s += String.fromCharCode.apply(null, 덩.subarray(k, k + 8192));
+        if (!앱.shareChunk(btoa(s))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+      }
     }
     await 쉼(0);
   }
+  알림('공유 창 여는 중 …');
   const 꼴 = 파일들.every(f => (f.type || '').startsWith('image/')) ? 'image/*' : '*/*';
   if (!앱.shareMultiEnd(꼴, 글 || '')) throw new Error('공유 창을 못 띄움');
 };

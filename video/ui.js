@@ -121,6 +121,7 @@ function 요약그리기() {
   $('보내기').disabled = !n;
   if (typeof 준비버림 === 'function') 준비버림();     // 고른 장면이 바뀌면 만들어 둔 그림은 버림
   clearTimeout(미리판때); 미리판때 = setTimeout(미리판그리기, 200);
+  if (typeof 복사줄그리기 === 'function') 복사줄그리기();
 }
 function 미리판그리기() {
   $('미리판').innerHTML = '';
@@ -137,14 +138,16 @@ $('손으로').onclick = () => {                     // 2 단계 — 영상을 �
   $('손수').textContent = `꼭 넣을 장면 ${상태.손장면.length} (${상태.손장면.map(s => 영상.시각(s.t)).join(' · ')})`;
 };
 
-async function 보낼파일들() {
+// 앱용 = 갤럭시 문서보기 앱으로 보낼 때 — toBlob 없이 바로 base64 (영상.앱그림 · 10-10 폰에서 멈춤)
+async function 보낼파일들(앱용 = false) {
   const 고른 = 고른것();
-  if (상태.꼴 === '판') {
-    const 판들 = 영상.장면판들(고른, { 머리글: 상태.출처 });
-    return Promise.all(판들.map((c, i) => 영상.파일로(c, `장면판_${i + 1}.jpg`)));
-  }
-  return Promise.all(고른.map((s, i) => 영상.파일로(s.그림, `장면_${String(i + 1).padStart(2, '0')}_${영상.시각(s.t).replace(':', '-')}.jpg`)));
+  const 그림들 = 상태.꼴 === '판'
+    ? 영상.장면판들(고른, { 머리글: 상태.출처 }).map((c, i) => [c, `장면판_${i + 1}.jpg`])
+    : 고른.map((s, i) => [s.그림, `장면_${String(i + 1).padStart(2, '0')}_${영상.시각(s.t).replace(':', '-')}.jpg`]);
+  if (앱용) return 그림들.map(([c, 이름]) => 영상.앱그림(c, 이름));
+  return 영상.제한(Promise.all(그림들.map(([c, 이름]) => 영상.파일로(c, 이름))), 20000, '그림 만들기');
 }
+const 앱안 = () => !!(window.Android && window.Android.shareMultiBegin);
 // 폰 공유 창은 «누른 손가락» 이 식으면 거절함 (34번 10-03 실측) → 그림을 만드느라 늦어 거절되면
 // 만든 파일을 들고 「보낼 준비 됨 → 한 번 더 누르기」 로 바꿔 두고, 다음 누름에 바로 보냄
 let 보낼준비 = null;
@@ -152,8 +155,8 @@ const 보내기글 = '클로드에게 보내기';
 function 준비버림() { 보낼준비 = null; $('보내기').textContent = 보내기글; }
 $('보내기').onclick = async () => {
   try {
-    if (!보낼준비) { $('상황3').textContent = '그림 만드는 중 …'; 보낼준비 = { 파일들: await 보낼파일들(), 글: $('함께글').value }; }
-    const 어떻게 = await 영상.보내기(보낼준비.파일들, 보낼준비.글);
+    if (!보낼준비) { $('상황3').textContent = '그림 만드는 중 …'; await 쉼(30) /* 글이 먼저 화면에 그려지게 */; 보낼준비 = { 파일들: await 보낼파일들(앱안()), 글: $('함께글').value }; }
+    const 어떻게 = await 영상.보내기(보낼준비.파일들, 보낼준비.글, 글 => { $('상황3').textContent = 글; });
     준비버림();
     $('상황3').textContent = 어떻게 === '공유'
       ? '공유 창을 열었음 → 클로드 고르기 · 답이 오면 「4 내용 문서」'
@@ -175,6 +178,51 @@ $('저장만').onclick = async () => {
   for (const f of 파일들) { 내려받기(f); await new Promise(r => setTimeout(r, 250)); }
   $('상황3').textContent = `그림 ${파일들.length}장 저장함`;
 };
+// 복사해서 붙여 넣기 (10-10 · «카피해서 클로드에 전달» 요청) — 공유 창이 안 뜰 때의 다른 길
+//   폰 클립보드는 한 칸 → 그림 한 장 또는 글 하나씩 : 복사 → 클로드 입력칸 길게 눌러 붙여넣기 → 다음 것
+//   갤럭시 앱 : 문서보기 「복사」 다리(copyBegin/Chunk/End → 클립보드 그림) · 웹 : ClipboardItem(약속을 누른 손가락 안에서 바로)
+function 복사줄그리기() {
+  const n = 고른것().length, 장수 = 상태.꼴 === '판' ? Math.ceil(n / 9) : n;
+  $('복사줄').innerHTML = n ? '복사해서 붙여 넣기 :' : '';
+  if (!n) return;
+  const 단추 = (글, 할일) => { const b = document.createElement('button'); b.textContent = 글; b.onclick = 할일; $('복사줄').appendChild(b); };
+  단추('📋 글', 글복사);
+  for (let i = 0; i < 장수; i++) 단추(`📋 그림 ${i + 1}`, () => 그림복사(i));
+}
+function 복사할캔버스(i) {
+  const 고른 = 고른것();
+  return 상태.꼴 === '판' ? 영상.장면판들(고른, { 머리글: 상태.출처 })[i] : 고른[i].그림;
+}
+function 글복사() {
+  const 글 = $('함께글').value;
+  const t = document.createElement('textarea'); t.value = 글; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;top:0;left:-9999px';
+  document.body.appendChild(t); t.select(); let 됨 = false;
+  try { 됨 = document.execCommand('copy'); } catch (e) { /* 아래 길로 */ }
+  t.remove();
+  if (됨) { $('상황3').textContent = '글 복사함 → 클로드 입력칸 길게 눌러 붙여넣기'; return; }
+  (navigator.clipboard ? 영상.제한(navigator.clipboard.writeText(글), 5000, '글 복사') : Promise.reject(new Error('복사 못 하는 브라우저')))
+    .then(() => { $('상황3').textContent = '글 복사함 → 클로드 입력칸 길게 눌러 붙여넣기'; })
+    .catch(e => { $('상황3').textContent = '글 복사 못 함 → 글 칸을 길게 눌러 직접 복사 (' + e.message + ')'; });
+}
+async function 그림복사(i) {
+  const 다 = `그림 ${i + 1} 복사함 → 클로드 입력칸 길게 눌러 붙여넣기`;
+  try {
+    const c = 복사할캔버스(i);
+    const 앱 = window.Android;
+    if (앱 && 앱.copyBegin) {
+      $('상황3').textContent = `그림 ${i + 1} 복사하는 중 …`; await 쉼(30);
+      const b64 = c.toDataURL('image/png').split(',')[1], 글크기 = 524288;   // 다리 파일 이름이 .png — 꼴을 맞춤 · toBlob 안 씀
+      if (!앱.copyBegin()) throw new Error('파일을 못 만듦');
+      for (let k = 0; k < b64.length; k += 글크기) if (!앱.copyChunk(b64.slice(k, k + 글크기))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+      if (!앱.copyEnd()) throw new Error('클립보드에 못 넣음');
+      $('상황3').textContent = 다; return;
+    }
+    if (!navigator.clipboard || !window.ClipboardItem) throw new Error('그림 복사를 못 하는 브라우저 → 「저장만」');
+    const 약속 = new Promise((ok, no) => c.toBlob(b => b ? ok(b) : no(new Error('그림을 못 만듦')), 'image/png'));
+    await 영상.제한(navigator.clipboard.write([new ClipboardItem({ 'image/png': 약속 })]), 15000, '그림 복사');
+    $('상황3').textContent = 다;
+  } catch (e) { $('상황3').textContent = `그림 ${i + 1} 복사 못 함 → ` + e.message; }
+}
 $('다음4').onclick = () => { 단계(4); 문서그리기(); $('답').focus(); };
 
 // ⑤ 4 내용 문서 ────────────────────────────────────────
