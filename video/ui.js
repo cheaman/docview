@@ -186,8 +186,25 @@ function 복사줄그리기() {
   $('복사줄').innerHTML = n ? '복사해서 붙여 넣기 :' : '';
   if (!n) return;
   const 단추 = (글, 할일) => { const b = document.createElement('button'); b.textContent = 글; b.onclick = 할일; $('복사줄').appendChild(b); };
+  if (장수 > 1 && window.Android && window.Android.copyMultiBegin) 단추(`📋 모두 (그림 ${장수} + 글)`, 모두복사);
   단추('📋 글', 글복사);
   for (let i = 0; i < 장수; i++) 단추(`📋 그림 ${i + 1}`, () => 그림복사(i));
+}
+// 📋 모두 (10-10) — 갤럭시 앱만 : 클립보드 한 칸에 그림 여러 장 + 글 (붙여 넣는 앱이 첫 장만 받으면 낱개 단추로)
+async function 모두복사() {
+  const 앱 = window.Android, n = 상태.꼴 === '판' ? Math.ceil(고른것().length / 9) : 고른것().length;
+  try {
+    $('상황3').textContent = `그림 ${n}장 복사하는 중 …`; await 쉼(30);
+    if (!앱.copyMultiBegin()) throw new Error('파일을 못 만듦');
+    for (let i = 0; i < n; i++) {
+      $('상황3').textContent = `그림 ${i + 1}/${n} 복사하는 중 …`; await 쉼(0);
+      const b64 = 복사할캔버스(i).toDataURL('image/png').split(',')[1], 글크기 = 524288;
+      if (!앱.copyMultiFile(i + 1)) throw new Error('파일을 못 만듦');
+      for (let k = 0; k < b64.length; k += 글크기) if (!앱.copyChunk(b64.slice(k, k + 글크기))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+    }
+    if (!앱.copyMultiEnd($('함께글').value)) throw new Error('클립보드에 못 넣음');
+    $('상황3').textContent = `그림 ${n}장 + 글 복사함 → 클로드 입력칸 길게 눌러 붙여넣기 (한 장만 들어가면 아래 낱개 단추로)`;
+  } catch (e) { $('상황3').textContent = '모두 복사 못 함 → ' + e.message; }
 }
 function 복사할캔버스(i) {
   const 고른 = 고른것();
