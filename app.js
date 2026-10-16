@@ -927,7 +927,7 @@ $('#layers').addEventListener('click', () => {
 
 function 문서주소(d) { if (d.주소) return d.주소; return 폰 ? `/doc/${encodeURIComponent(d.id)}` : 웹 ? `doc/${encodeURIComponent(d.id)}` : `_시험문서/${encodeURIComponent(d.name)}`; }   // 웹은 일꾼(sw.js)이 보관함에서 내줌
 function 도구보이기(목록) {
-  if (목록.length) 목록 = [...목록, ...(목록.includes('pen') ? ['copy'] : []), 'share'];   // 연 문서는 모두 「보내기」 (v0.7) · 펜이 되는 문서는 「복사」 도 (10-04)
+  if (목록.length) 목록 = [...목록, ...(목록.includes('pen') || 목록.includes('find') ? ['copy'] : []), 'share'];   // 연 문서는 모두 「보내기」 (v0.7) · 펜이 되는 문서는 「복사」 도 (10-04) · 글 문서도 = 글 모두 복사 (1.0.4)
   for (const b of document.querySelectorAll('#tools .tool')) b.hidden = !목록.includes(b.id);   // 단추를 더해도 빠짐없이 (10-03 도면 단추가 엑셀에 보이던 것)
   $('#tools').hidden = 목록.length === 0;
 }
@@ -2062,6 +2062,30 @@ function 그림복사(만들기) {                                         // �
 }
 $('#copy').addEventListener('click', () => { if (지금 && !보내는중) 골라열기(); });
 
+// ④-6d 글 모두 복사 (1.0.4 · 전무님 「텍스트 문서를 통째 복사하려면 누르고 전체 선택해야 함」 · 고름 «복사 틀 아래 글 모두»)
+//   글 문서(TXT · 한글 · 워드 · 엑셀 …) = 「복사」 한 번에 글 전체 · PDF · PPT = 틀 아래 「📋 글 모두」
+//   글은 문서를 열 때 뽑아 둔 것(글캐시 · 전체 찾기와 같은 글) → 아직 없으면 글 문서는 화면 글 · PDF · PPT 는 «뽑는 중»
+//   누른 손가락 안에서 바로 (execCommand 먼저 · 안 되면 navigator.clipboard)
+function 글모두() {
+  const d = 지금?.d; if (!d) return null;
+  const o = 글캐시.get(d.id);
+  if (o && !o.없음) { const t = (o.쪽 ? o.쪽.join('\n\n') : o.글 || '').trim(); if (t) return t; }
+  if (!지금.쪽수 && !지금.그림 && !도면판) { const t = ($('#flowin')?.innerText || '').trim(); if (t) return t; }
+  return null;
+}
+function 글복사하기(t) {
+  const 긴칩 = 말 => { 칩(말); clearTimeout(칩시계); 칩시계 = setTimeout(() => ($('#chip').hidden = true), 2800); };
+  const 됨말 = `📋 글 ${t.length.toLocaleString()}자 복사됨 → 다른 앱에서 길게 눌러 붙여넣기`;
+  if (!폰 && !웹) window.마지막글복사 = t;                          // PC 시험 — 무엇을 복사했나 잼
+  const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:-9999px';
+  document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, t.length); let 됨 = false;
+  try { 됨 = document.execCommand('copy'); } catch (e) { /* 아래 길로 */ }
+  ta.remove();
+  if (됨) return 긴칩(됨말);
+  (navigator.clipboard?.writeText ? navigator.clipboard.writeText(t) : Promise.reject(new Error('복사 못 하는 브라우저')))
+    .then(() => 긴칩(됨말), e => 알림(`<b>글 복사 안 됨</b><div class="sm">${글(e?.message || e)} → 글을 길게 눌러 직접 고르기</div>`));
+}
+
 // ④-6c 골라 복사 (0.9.10 · 목업 1_읽을거리\골라복사_목업.html · 전무님 「복사 누르면 틀 · 복사 · 보내기 · 새 그림 · 그림 + PDF · PPT + 도면」)
 //   「복사」 → 틀 (처음 = 보는 쪽 중 화면에 보이는 만큼 → 바로 「복사」 = 전처럼 통째) · 귀 끌기 = 크기 · 틀 안 끌기 = 옮김 · 틀 밖 끌기 = 새로 그림
 //   틀이 거의 전체(95% 넘게 · 처음)면 틀 안을 끌어도 새로 그림 — 처음엔 «틀 밖» 이 없어서 (시험에서 찾음)
@@ -2077,7 +2101,7 @@ function 골판() {
 }
 function 골라열기() {
   const g = 골판();
-  if (!g) return 알림판('이 문서는 복사 안 됨 → 「보내기」 로');
+  if (!g) { const t = 글모두(); return t ? 글복사하기(t) : 알림판('이 문서는 복사 안 됨 → 「보내기」 로'); }   // 글 문서 = 글 전체 바로 (1.0.4)
   찾기닫기(); 펜끄기(); 재기끄기();
   const { 판, 보는 } = g;
   const 한 = { l: Math.max(판.left, 보는.left), t: Math.max(판.top, 보는.top), r: Math.min(판.right, 보는.right), b: Math.min(판.bottom, 보는.bottom) };
@@ -2087,12 +2111,13 @@ function 골라열기() {
   if (!el) {
     el = document.createElement('div'); el.id = 'crop'; el.className = '골';
     el.innerHTML = '<div class="골안내">끌어서 고르기 · 귀 = 크기 · 틀 안 = 옮김</div><div class="골틀"><span class="골치수"></span><i data-g="lt"></i><i data-g="rt"></i><i data-g="lb"></i><i data-g="rb"></i></div>'
-      + '<div class="골바"><button data-a="닫기">취소</button><button data-a="복사" class="주">📋 복사</button><button data-a="보내기">⇪ 보내기</button><button data-a="새그림">＋ 새 그림</button></div>';
+      + '<div class="골바"><button data-a="닫기">취소</button><button data-a="복사" class="주">📋 복사</button><button data-a="글" hidden>📋 글 모두</button><button data-a="보내기">⇪ 보내기</button><button data-a="새그림">＋ 새 그림</button></div>';
     document.body.append(el);
     골손잡이(el);
     el.querySelector('.골바').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (b) 골동작(b.dataset.a); });
   }
   el.hidden = false;
+  el.querySelector('[data-a="글"]').hidden = !(지금.쪽수 && 글되는가(지금.d));   // PDF · PPT 만 (그림 · 도면은 글 없음)
   if (history.state?.v !== '골라') history.pushState({ v: '골라' }, '');
   골그리기();
 }
@@ -2158,6 +2183,7 @@ function 골손잡이(el) {
 async function 골동작(a) {
   if (!골) return;
   if (a === '닫기') return 골닫기();
+  if (a === '글') { const t = 글모두(); 골닫기(); return t ? 글복사하기(t) : 알림판('글을 아직 뽑는 중 → 잠시 뒤 다시'); }
   const 자름 = 골자름(), d = 지금.d, 밑 = d.name.replace(/\.[^.]+$/, '') + '_잘라냄', 쪽 = 지금.쪽수 ? `_${보는쪽() + 1}쪽` : '';
   골닫기();
   if (a === '복사') return 그림복사(() => 지금그림캔버스(자름));   // 누른 손가락 안에서 바로 (아이폰)
