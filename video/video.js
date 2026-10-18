@@ -2,12 +2,14 @@
 // 하는 일 : 녹화한 영상을 받아 → 앞뒤 자르기 → 장면 뽑기 → 장면판(9칸 그림) + 함께 갈 글 → 공유
 //           클로드가 써 준 «내용 문서»를 받아 → 글 파일(.md) · 워드(.docx)로 만들어 → 공유
 // 34번 문서보기에 넣을 부품 — 화면(영상.html)과 떨어져도 돌게 «셈»만 여기 둔다. 인터넷을 쓰지 않는다.
-// 구역 지도 : ① 영상 열기 · 찾아가기 ② 장면 뽑기 ③ 장면판 그리기 ④ 함께 갈 글 ⑤ 내용 문서 → md · docx ⑥ 보내기
+// 구역 지도 : ① 영상 열기 · 찾아가기 ② 장면 뽑기 ③ 장면판 그리기 ④ 함께 갈 글 ⑤ 내용 문서 → md · docx ⑥ 보내기 ⑦ 잘라낸 영상 · 그림 띠
 'use strict';
 const 영상 = {};
 
 const 쉼 = ms => new Promise(r => setTimeout(r, ms));
 영상.시각 = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+// 0.1초까지 — 구간 자르기 화면 (10-18) · 예 : 0:12.4
+영상.시각10 = s => { const d = Math.max(0, Math.round(s * 10)); return Math.floor(d / 600) + ':' + String(Math.floor(d / 10) % 60).padStart(2, '0') + '.' + (d % 10); };
 
 // 이벤트 하나를 기다림 — 시간이 넘으면 오류
 function 기다림(el, 이름, ms) {
@@ -38,9 +40,12 @@ function 기다림(el, 이름, ms) {
 영상.가기 = async function (v, t) {
   t = Math.min(Math.max(0, t), v.duration - 0.02);
   if (Math.abs(v.currentTime - t) < 0.001 && !v.seeking) return;
-  const 됨 = 기다림(v, 'seeked', 5000);
-  v.currentTime = t;
-  await 됨;
+  // 10-18 · 틀었다 멈춘 뒤(구간만 다시 보기) 찾아가기가 «찾는 중» 에 멈추는 일 (크롬 · 녹화 webm) → 조금 비켜 다시 찾게 함
+  for (let n = 0; ; n++) {
+    const 됨 = 기다림(v, 'seeked', n < 2 ? 2500 : 5000);
+    v.currentTime = t + n * 0.001;
+    try { await 됨; return; } catch (e) { if (n >= 2) throw e; }
+  }
 };
 
 // ② 장면 뽑기 ─────────────────────────────────────────────
@@ -282,6 +287,101 @@ const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = 
     await 쉼(0);
   }
   알림('공유 창 여는 중 …');
-  const 꼴 = 파일들.every(f => (f.type || '').startsWith('image/')) ? 'image/*' : '*/*';
+  const 다 = 앞 => 파일들.every(f => (f.type || '').startsWith(앞));
+  const 꼴 = 다('image/') ? 'image/*' : 다('video/') ? 'video/*' : '*/*';     // 잘라낸 영상은 video/* (10-18)
   if (!앱.shareMultiEnd(꼴, 글 || '')) throw new Error('공유 창을 못 띄움');
+};
+
+// ⑦ 잘라낸 영상 · 그림 띠 (10-18 · 사용자 요청 「구간을 잘라 바로 옮기게」) ─────────────
+// 폰 브라우저에는 영상을 «다시 누르지 않고 자르는» 길이 없음 → 숨은 <video> 로 그 구간을 틀면서 MediaRecorder 로 다시 녹화
+//   걸리는 시간 = 구간 길이 (18초 → 약 18초) · 꼴은 mp4 먼저 (카톡 · 갤러리가 잘 받음) · 안 되면 webm
+//   그림 : ⓐ video.captureStream() (크롬 · 갤럭시 WebView) ⓑ 없으면 캔버스에 그려서 (사파리)
+//   소리 : WebAudio 로 숨은 영상 소리를 녹화기에만 이음 → 녹화하는 동안 스피커로는 안 나옴
+영상.녹화꼴 = () => {
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  return ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4',
+    'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+};
+// 화면에 안 보이는 일꾼 영상 — 보이는 영상(자르기 화면)의 자리를 건드리지 않게 따로 둠
+function 숨은영상(주소) {
+  const w = document.createElement('video');
+  w.muted = true; w.playsInline = true; w.preload = 'auto';
+  w.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
+  w.src = 주소; document.body.appendChild(w);
+  return w;
+}
+
+// 그림 띠 — 영상 전체를 «수» 칸으로 나눠 칸 가운데 장면을 작은 그림(dataURL)으로
+영상.띠그림들 = async function (주소, 길이, 수 = 8, 높 = 72) {
+  const w = 숨은영상(주소);
+  try {
+    await 기다림(w, 'loadedmetadata', 15000);
+    const 폭 = Math.max(1, Math.round(높 * w.videoWidth / w.videoHeight)), 그림들 = [];
+    const c = document.createElement('canvas'); c.width = 폭; c.height = 높;
+    for (let i = 0; i < 수; i++) {
+      await 영상.가기(w, (i + 0.5) * 길이 / 수);
+      c.getContext('2d').drawImage(w, 0, 0, 폭, 높);
+      그림들.push(c.toDataURL('image/jpeg', 0.6));
+    }
+    return 그림들;
+  } finally { w.remove(); }
+};
+
+// 잘라낸 영상 만들기 → { 파일, 소리 }
+//   설정 : 알림(0~1) · 이름(확장자 없이) · 취소({됨}) · 캔버스길(시험용 — 사파리 길을 PC 에서 잼)
+영상.구간영상 = async function (주소, 시작, 끝, 설정 = {}) {
+  const { 알림 = () => {}, 이름 = '잘라낸영상', 취소 = { 됨: false }, 캔버스길 = false } = 설정;
+  const 꼴 = 영상.녹화꼴();
+  if (!꼴) throw new Error('이 브라우저는 영상을 못 만듦 (MediaRecorder 없음)');
+  const 길이 = Math.max(0.1, 끝 - 시작);
+  const w = 숨은영상(주소), 흐름 = new MediaStream(), 정리 = [];
+  try {
+    await 기다림(w, 'loadedmetadata', 15000);
+    await 영상.가기(w, 시작);
+    // 그림 길
+    const 잡기 = w.captureStream || w.mozCaptureStream;
+    if (잡기 && !캔버스길) 잡기.call(w).getVideoTracks().forEach(t => 흐름.addTrack(t));
+    else {
+      const 배 = Math.min(1, 1280 / Math.max(w.videoWidth, w.videoHeight));       // 긴 변 1280 까지 (폰 기억 공간)
+      const c = document.createElement('canvas'); c.width = Math.round(w.videoWidth * 배) & ~1; c.height = Math.round(w.videoHeight * 배) & ~1;
+      const x = c.getContext('2d'); x.drawImage(w, 0, 0, c.width, c.height);
+      c.captureStream(30).getVideoTracks().forEach(t => 흐름.addTrack(t));
+      let 켬 = true; const 그리기 = () => { if (!켬) return; x.drawImage(w, 0, 0, c.width, c.height); setTimeout(그리기, 33); };
+      그리기(); 정리.push(() => { 켬 = false; });
+    }
+    // 소리 길 — 안 되면 소리 없이 (그림은 그대로)
+    let 소리 = false;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      정리.push(() => ctx.close().catch(() => {}));
+      const 들 = ctx.createMediaElementSource(w), 날 = ctx.createMediaStreamDestination();
+      들.connect(날);
+      if (ctx.state !== 'running') await 영상.제한(ctx.resume(), 2000, '소리 준비').catch(() => {});
+      if (ctx.state === 'running') { 날.stream.getAudioTracks().forEach(t => 흐름.addTrack(t)); w.muted = false; 소리 = true; }
+    } catch (e) { /* 소리 없이 */ }
+    // 녹화
+    const 화소 = w.videoWidth * w.videoHeight;
+    const 녹 = new MediaRecorder(흐름, { mimeType: 꼴, videoBitsPerSecond: Math.round(Math.min(8e6, Math.max(1.5e6, 화소 * 30 * 0.12))), audioBitsPerSecond: 128000 });
+    const 조각 = []; 녹.ondataavailable = e => e.data && e.data.size && 조각.push(e.data);
+    const 멈춤 = new Promise(r => { 녹.onstop = r; });
+    녹.start(1000);
+    try { await w.play(); }
+    catch (e) { w.muted = true; 소리 = false; await w.play(); }              // 소리 내며 틀기를 막으면 소리 없이
+    const 한도 = performance.now() + 길이 * 3000 + 10000;
+    while (w.currentTime < 끝 && !w.ended) {
+      if (취소.됨) break;
+      if (performance.now() > 한도) { 녹.stop(); throw new Error('영상 만들기에서 멈춤'); }
+      알림(Math.min(1, (w.currentTime - 시작) / 길이));
+      await 쉼(40);
+    }
+    w.pause(); 녹.stop(); await 멈춤;
+    if (취소.됨) { const e = new Error('취소함'); e.name = 'AbortError'; throw e; }
+    알림(1);
+    const 꼴이름 = 꼴.split(';')[0], 끝말 = 꼴이름 === 'video/mp4' ? '.mp4' : '.webm';
+    return { 파일: new File(조각, 이름 + 끝말, { type: 꼴이름 }), 소리 };
+  } finally {
+    정리.forEach(f => f());
+    흐름.getTracks().forEach(t => t.stop());
+    w.pause(); w.remove();
+  }
 };

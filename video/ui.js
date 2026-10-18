@@ -1,27 +1,32 @@
-// 영상 화면 움직임 (36번 · v0.1 · 2026-10-04) — 단추 · 칸 · 상황 한 줄. 셈은 영상.js 에 있다.
-// 구역 지도 : ① 상태 · 단계 ② 1 가져오기 ③ 2 자르기 · 물을 말 ④ 3 장면 고르기 · 보내기 ⑤ 4 내용 문서 ⑥ 시험 걸쇠
-// 잠금 표 (화면규칙 1장) — 잠그는 단추는 둘뿐, 나머지는 늘 눌림 · 안 되면 그 칸 «상황» 줄에 까닭을 씀
-//   [장면 뽑기 →]      뽑는 동안 잠금        → 두 번 눌러 겹쳐 뽑는 것 막기 · 끝나면 풀림 (뽑기실행 finally)
-//   [클로드에게 보내기] 고른 장면 0 이면 잠금  → 빈 장면판을 안 보냄 · 하나라도 고르면 풀림 (요약그리기)
-//   4 내용 문서 단추 넷 — 잠그지 않음, 답이 비었으면 상황 줄에 «클로드 답을 먼저 붙여 넣기»
+// 영상 화면 움직임 (36번 · v0.2 · 2026-10-18 구간 자르기 · 바로 옮기기) — 단추 · 칸 · 상황 한 줄. 셈은 영상.js 에 있다.
+// 구역 지도 : ① 상태 · 단계 ② 1 영상 열기 ③ 2 구간 자르기 ④ 3 옮기기 — 잘라낸 영상 ⑤ 3 옮기기 — 클로드에게 ⑥ 클로드 답 정리 ⑦ 앱 안 ⑧ 시험 걸쇠
+// 잠금 표 (화면규칙 1장) — 잠그는 단추는 아래뿐, 나머지는 늘 눌림 · 안 되면 그 칸 «상황» 줄에 까닭을 씀
+//   [⇪ 보내기 · 📋 복사 · 💾 저장] (잘라낸 영상) 영상을 다 만들 때까지 잠금 → 반쪽 영상을 안 보냄 · 다 되면 풀림
+//   [📋 복사 → 클로드 · ⇪ 클로드로 공유]       고른 장면 0 이면 잠금 → 빈 장면판을 안 보냄 · 하나라도 고르면 풀림
+//   클로드 답 정리 단추 넷 — 잠그지 않음, 답이 비었으면 상황 줄에 «클로드 답을 먼저 붙여 넣기»
 'use strict';
 const $ = id => document.getElementById(id);
 const v = $('영상');
 
 // ① 상태 · 단계 ────────────────────────────────────────
-const 상태 = { 파일: null, 출처: '녹화 영상', 길이: 0, 시작: 0, 끝: 0, 방식: '바뀔때', 손장면: [], 장면들: [], 꼴: '판', 지금: 1, 끝난단계: 0 };
+const 상태 = { 파일: null, 출처: '녹화 영상', 길이: 0, 시작: 0, 끝: 0, 방식: '바뀔때', 손장면: [], 장면들: [], 꼴: '판', 지금: 1,
+  장면키: '', 영상작업: null, 잘린영상: null, 반복: false };
 function 단계(n) {
-  상태.지금 = n; 상태.끝난단계 = Math.max(상태.끝난단계, n - 1);
+  상태.지금 = n;
   [1, 2, 3, 4].forEach(k => { $('칸' + k).hidden = k !== n; });
   document.querySelectorAll('#단계 span').forEach(s => {
     const k = +s.dataset.n;
-    s.className = k === n ? '지금' : k <= 상태.끝난단계 || (k <= 3 && 상태.장면들.length && k < n) ? '됨' : '';
+    if (k === 4) s.hidden = n !== 4;                      // 「클로드 답 정리」 는 그 칸에 있을 때만
+    s.className = k === n ? '지금' : (k === 2 && 상태.파일) || (k === 3 && 상태.장면들.length) ? '됨' : '';
   });
+  if (n !== 2) { 반복끔(); v.pause(); }
   window.scrollTo(0, 0);
 }
 document.querySelectorAll('#단계 span').forEach(s => s.onclick = () => {
   const k = +s.dataset.n;
-  if (k === 1 || k === 4 || (k === 2 && 상태.파일) || (k === 3 && 상태.장면들.length)) 단계(k);
+  if (k === 1) 단계(1);
+  else if (k === 2 && 상태.파일) 단계(2);
+  else if (k === 3 && 상태.파일) 옮기기시작();
 });
 function 칩고르기(묶음id, 바꿀때) {
   $(묶음id).querySelectorAll('.칩').forEach(b => b.onclick = () => {
@@ -29,18 +34,25 @@ function 칩고르기(묶음id, 바꿀때) {
     바꿀때(b.dataset.v, b);
   });
 }
+const 크기글 = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + 'KB' : (n / 1048576).toFixed(1) + 'MB';
 
-// ② 1 가져오기 ─────────────────────────────────────────
+// ② 1 영상 열기 ────────────────────────────────────────
 async function 가져오기(파일) {
-  상태.파일 = 파일; 상태.손장면 = []; 상태.장면들 = []; $('손수').textContent = '';
+  영상작업취소();
+  Object.assign(상태, { 파일, 손장면: [], 장면들: [], 장면키: '', 잘린영상: null });
+  $('손수').textContent = '→ 영상을 멈춘 장면을 클로드에게 갈 장면에 꼭 넣음';
+  $('띠칸').innerHTML = '';
   $('상황2').textContent = '영상 여는 중 …';
   단계(2);
   try {
     상태.길이 = await 영상.열기(v, 파일);
     상태.시작 = 0; 상태.끝 = 상태.길이;
-    $('시작').value = 0; $('끝').value = 1000;
     자르기그림();
-    $('상황2').textContent = `영상 ${영상.시각(상태.길이)} · ${v.videoWidth}×${v.videoHeight}`;
+    $('상황2').textContent = `영상 ${영상.시각(상태.길이)} · ${v.videoWidth}×${v.videoHeight} → 손잡이를 끌어 쓸 구간을 고르기`;
+    영상.띠그림들(v._주소, 상태.길이, 8).then(그림들 => {      // 그림 띠는 뒤에서 — 그동안에도 자르기는 됨
+      if (상태.파일 !== 파일) return;
+      $('띠칸').innerHTML = 그림들.map(s => `<img alt="" src="${s}">`).join('');
+    }).catch(() => {});
   } catch (e) {
     $('상황2').textContent = '이 영상은 못 엶 → ' + e.message;
   }
@@ -52,55 +64,187 @@ const 놓는곳 = $('놓는곳');
 놓는곳.ondrop = e => { e.preventDefault(); 놓는곳.classList.remove('위'); const f = e.dataTransfer.files[0]; if (f) 가져오기(f); };
 $('문서만').onclick = () => { 단계(4); 문서그리기(); $('답').focus(); };
 
-// ③ 2 자르기 · 물을 말 ─────────────────────────────────
+// ③ 2 구간 자르기 ──────────────────────────────────────
+//   그림 띠 위 손잡이 둘 (손가락이 닿은 자리에서 가까운 손잡이를 잡음) · ±0.1초 · ±1초 · 여기(영상을 멈춘 자리)
+const 최소길이 = () => Math.min(0.5, 상태.길이 / 2);
 function 자르기그림() {
-  const 길이 = 상태.길이 || 1;
-  $('쓸').style.left = (상태.시작 / 길이 * 100) + '%';
-  $('쓸').style.width = ((상태.끝 - 상태.시작) / 길이 * 100) + '%';
-  $('시작글').textContent = 영상.시각(상태.시작);
-  $('끝글').textContent = 영상.시각(상태.끝);
-  $('길이글').textContent = `쓸 부분 ${영상.시각(상태.끝 - 상태.시작)}`;
+  const 길이 = 상태.길이 || 1, 앞 = 상태.시작 / 길이 * 100, 뒤 = 상태.끝 / 길이 * 100;
+  $('고른틀').style.left = `calc(${앞}% - 14px)`;
+  $('고른틀').style.width = (뒤 - 앞) + '%';
+  $('가림앞').style.width = 앞 + '%';
+  $('가림뒤').style.width = (100 - 뒤) + '%';
+  $('시작글').textContent = 영상.시각10(상태.시작);
+  $('끝글').textContent = 영상.시각10(상태.끝);
+  $('길이글').textContent = (상태.끝 - 상태.시작).toFixed(1) + '초';
+  재생선그림();
 }
-function 자르기바뀜(누구) {
-  const 길이 = 상태.길이, 최소 = Math.min(1, 길이 / 2);
-  let s = $('시작').value / 1000 * 길이, e = $('끝').value / 1000 * 길이;
-  if (e - s < 최소) { if (누구 === '시작') s = e - 최소; else e = s + 최소; }
-  상태.시작 = Math.max(0, s); 상태.끝 = Math.min(길이, e);
-  $('시작').value = Math.round(상태.시작 / 길이 * 1000); $('끝').value = Math.round(상태.끝 / 길이 * 1000);
+function 재생선그림() { $('재생선').style.left = (v.currentTime / (상태.길이 || 1) * 100) + '%'; }
+// k = '시작' | '끝' · t 초 → 최소 길이를 지키며 고치고, 영상을 그 자리로 보여 줌
+function 구간바꿈(k, t) {
+  if (!상태.파일 || !상태.길이) return;
+  const 최소 = 최소길이();
+  if (k === '시작') 상태.시작 = Math.max(0, Math.min(t, 상태.끝 - 최소));
+  else 상태.끝 = Math.min(상태.길이, Math.max(t, 상태.시작 + 최소));
+  상태.시작 = Math.round(상태.시작 * 10) / 10; 상태.끝 = Math.min(상태.길이, Math.round(상태.끝 * 10) / 10);
+  반복끔(); v.pause();
+  v.currentTime = k === '시작' ? 상태.시작 : Math.max(0, 상태.끝 - 0.05);
   자르기그림();
-  v.currentTime = 누구 === '시작' ? 상태.시작 : Math.max(0, 상태.끝 - 0.05);
 }
-$('시작').oninput = () => 자르기바뀜('시작');
-$('끝').oninput = () => 자르기바뀜('끝');
-$('여기시작').onclick = () => { $('시작').value = Math.round(v.currentTime / 상태.길이 * 1000); 자르기바뀜('시작'); };
-$('여기끝').onclick = () => { $('끝').value = Math.round(v.currentTime / 상태.길이 * 1000); 자르기바뀜('끝'); };
-칩고르기('방식', 값 => { 상태.방식 = 값; });
-칩고르기('물음칩', 값 => { $('물음').value = 값; if (!값) $('물음').focus(); });
+let 잡은 = null;
+$('띠').addEventListener('pointerdown', e => {
+  if (!상태.길이) return;
+  const r = $('띠').getBoundingClientRect(), t = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 상태.길이;
+  잡은 = Math.abs(t - 상태.시작) <= Math.abs(t - 상태.끝) && !(t > 상태.끝) ? '시작' : '끝';
+  try { $('띠').setPointerCapture(e.pointerId); } catch (_) { /* 가짜 손가락 */ }
+  구간바꿈(잡은, t);
+});
+$('띠').addEventListener('pointermove', e => {
+  if (!잡은) return;
+  const r = $('띠').getBoundingClientRect();
+  구간바꿈(잡은, Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 상태.길이);
+});
+['pointerup', 'pointercancel'].forEach(n => $('띠').addEventListener(n, () => { 잡은 = null; }));
+document.querySelectorAll('.다듬').forEach(줄 => 줄.querySelectorAll('button').forEach(b => b.onclick = () => {
+  const k = 줄.dataset.k, d = b.dataset.d;
+  구간바꿈(k, d === '여기' ? v.currentTime : 상태[k] + Number(d));
+}));
+function 반복끔() { 상태.반복 = false; $('다시보기').textContent = '▶ 구간만 다시 보기'; }
+// 되풀이 = 끝에 닿으면 멈춤 → 시작으로 찾아감(다 찾을 때까지 기다림) → 다시 틂
+//   틀어 둔 채 찾아가면 크롬이 «찾는 중» 에 멈추는 일이 있음 (10-18 시험 2번에 1번) → 꼭 멈추고 찾아감
+let 되감는중 = false;
+function 처음부터틀기() {
+  되감는중 = true; v.pause();
+  영상.가기(v, 상태.시작).then(() => 상태.반복 && v.play()).catch(() => 반복끔()).finally(() => { 되감는중 = false; });
+}
+$('다시보기').onclick = () => {
+  if (상태.반복) { 반복끔(); v.pause(); return; }
+  상태.반복 = true; $('다시보기').textContent = '■ 멈추기';
+  처음부터틀기();
+};
+v.addEventListener('timeupdate', () => {
+  if (상태.반복 && !되감는중 && (v.currentTime >= 상태.끝 || v.ended)) 처음부터틀기();
+  재생선그림();
+});
+v.addEventListener('seeked', 재생선그림);
+v.addEventListener('pause', () => { if (상태.반복 && !되감는중 && !v.ended && v.currentTime < 상태.끝 - 0.1) 반복끔(); });   // 사람이 영상 단추로 멈춤
+$('손으로').onclick = () => {                     // 영상을 멈춘 자리 한 장을 «꼭 넣을 장면» 으로
+  const t = v.currentTime;
+  if (상태.손장면.some(s => Math.abs(s.t - t) < 0.3)) return;
+  상태.손장면.push({ t, 그림: 영상.한장(v) });
+  $('손수').textContent = `꼭 넣을 장면 ${상태.손장면.length} (${상태.손장면.map(s => 영상.시각(s.t)).join(' · ')})`;
+};
+$('다음3').onclick = () => 옮기기시작();
 
-$('뽑기').onclick = () => 뽑기실행();
+// ④ 3 옮기기 — 잘라낸 영상 ─────────────────────────────
+//   3 칸에 오자마자 뒤에서 만듦 (구간이 그대로면 만든 것을 다시 씀) · 그동안 클로드 갈래는 장면을 뽑음
+function 옮기기시작() {
+  if (!상태.파일) return;
+  단계(3);
+  $('구간글').textContent = `${영상.시각10(상태.시작)} ~ ${영상.시각10(상태.끝)} · ${(상태.끝 - 상태.시작).toFixed(1)}초`;
+  const 장면키 = [상태.시작, 상태.끝, 상태.방식, 상태.손장면.length].join('|');
+  if (장면키 !== 상태.장면키) 뽑기실행();
+  영상만들기();
+}
+const 영상키 = () => 상태.시작 + '|' + 상태.끝;
+function 영상작업취소() { if (상태.영상작업) { 상태.영상작업.취소.됨 = true; 상태.영상작업 = null; } }
+function 영상단추(켬) { ['영상보내기', '영상복사', '영상저장'].forEach(id => { $(id).disabled = !켬; }); }
+$('영상복사').hidden = !(window.Android && window.Android.copyFileBegin);   // 영상 복사는 갤럭시 앱만 (웹 클립보드는 영상을 못 담음)
+async function 영상만들기() {
+  const 키 = 영상키();
+  if (상태.잘린영상 && 상태.잘린영상.키 === 키) { 영상다됨(); return 상태.잘린영상; }
+  if (상태.영상작업 && 상태.영상작업.키 === 키) return 상태.영상작업.약속;
+  영상작업취소(); 상태.잘린영상 = null; 영상단추(false);
+  if (!영상.녹화꼴()) { $('영상진행').hidden = true; $('상황영상').textContent = '이 브라우저는 영상을 못 만듦 → 장면 그림만 옮기기'; return null; }
+  const 길이 = 상태.끝 - 상태.시작, 막대 = $('영상진행').firstElementChild;
+  $('영상진행').hidden = false; 막대.style.width = '0%';
+  $('상황영상').textContent = `영상 만드는 중 0 / ${Math.round(길이)}초 → 끝나면 단추가 켜짐`;
+  const 작업 = { 키, 취소: { 됨: false } };
+  상태.영상작업 = 작업;
+  const 이름 = ((상태.파일.name || '영상').replace(/\.[^.]+$/, '') + `_${영상.시각10(상태.시작)}-${영상.시각10(상태.끝)}`).replace(/[\\/:*?"<>|]/g, '-');
+  작업.약속 = 영상.구간영상(v._주소, 상태.시작, 상태.끝, {
+    이름, 취소: 작업.취소,
+    알림: p => { if (상태.영상작업 !== 작업) return; 막대.style.width = Math.round(p * 100) + '%'; $('상황영상').textContent = `영상 만드는 중 ${Math.round(p * 길이)} / ${Math.round(길이)}초 → 끝나면 단추가 켜짐`; },
+  }).then(r => {
+    if (상태.영상작업 !== 작업) return null;
+    상태.영상작업 = null; 상태.잘린영상 = { 키, ...r }; 영상다됨(); return 상태.잘린영상;
+  }).catch(e => {
+    if (상태.영상작업 === 작업) { 상태.영상작업 = null; $('영상진행').hidden = true; $('상황영상').textContent = '영상을 못 만듦 → ' + e.message; }
+    return null;
+  });
+  return 작업.약속;
+}
+function 영상다됨() {
+  const r = 상태.잘린영상; $('영상진행').hidden = true; 영상단추(true);
+  $('상황영상').textContent = `다 만듦 · ${크기글(r.파일.size)} · ${r.파일.type === 'video/mp4' ? 'mp4' : 'webm'}${r.소리 ? '' : ' · 소리 없음'}`;
+}
+// 갤럭시 앱 다리로 파일 넘기기 — 384KB 씩 base64 (다리로는 글자만 오감)
+async function 조각보내기(파일, 보내기) {
+  const b = new Uint8Array(await 영상.제한(파일.arrayBuffer(), 30000, '영상 읽기'));
+  for (let i = 0; i < b.length; i += 393216) {
+    const 덩 = b.subarray(i, i + 393216); let s = '';
+    for (let k = 0; k < 덩.length; k += 8192) s += String.fromCharCode.apply(null, 덩.subarray(k, k + 8192));
+    if (!보내기(btoa(s))) throw new Error('쓰기 실패 (폰 저장 공간?)');
+    if (i % (393216 * 8) === 0) await 쉼(0);
+  }
+}
+$('영상보내기').onclick = async () => {
+  const r = 상태.잘린영상; if (!r) return;
+  try {
+    const 어떻게 = await 영상.보내기([r.파일], '', 글 => { $('상황영상').textContent = 글; });
+    $('상황영상').textContent = 어떻게 === '공유' ? '공유 창을 열었음 → 카톡 · 갤러리 · 드라이브 고르기' : '영상을 내려받았음';
+  } catch (e) { $('상황영상').textContent = e.name === 'AbortError' ? '보내기를 닫았음' : '못 보냄 → ' + e.message; }
+};
+$('영상복사').onclick = async () => {
+  const r = 상태.잘린영상, 앱 = window.Android; if (!r || !앱 || !앱.copyFileBegin) return;
+  try {
+    $('상황영상').textContent = '영상 복사하는 중 …'; await 쉼(30);
+    if (!앱.copyFileBegin(r.파일.name)) throw new Error('파일을 못 만듦');
+    await 조각보내기(r.파일, b => 앱.copyChunk(b));
+    if (!앱.copyEnd()) throw new Error('클립보드에 못 넣음');
+    $('상황영상').textContent = '영상 복사함 → 붙여 넣을 앱 입력칸을 길게 눌러 붙여넣기 (안 들어가면 「보내기」)';
+  } catch (e) { $('상황영상').textContent = '영상 복사 못 함 → ' + e.message; }
+};
+$('영상저장').onclick = async () => {
+  const r = 상태.잘린영상, 앱 = window.Android; if (!r) return;
+  try {
+    if (앱 && 앱.saveBegin) {
+      $('상황영상').textContent = '저장하는 중 …'; await 쉼(30);
+      if (!앱.saveBegin('영상', r.파일.name)) throw new Error('저장 자리를 못 만듦 (안드로이드 10 이상만)');
+      await 조각보내기(r.파일, b => 앱.saveChunk(b));
+      if (!앱.saveEnd()) throw new Error('저장을 못 끝냄');
+      $('상황영상').textContent = `저장함 → 다운로드 › 문서보기 › 영상 › ${r.파일.name}`;
+    } else { 내려받기(r.파일); $('상황영상').textContent = `저장함 → ${r.파일.name}`; }
+  } catch (e) { $('상황영상').textContent = '저장 못 함 → ' + e.message; }
+};
+
+// ⑤ 3 옮기기 — 클로드에게 (장면 그림 + 글) ────────────────
+칩고르기('방식', 값 => { 상태.방식 = 값; if (상태.지금 === 3) 뽑기실행(); });
+칩고르기('물음칩', 값 => { $('물음').value = 값; 요약그리기(); if (!값) $('물음').focus(); });
+$('물음').oninput = () => 요약그리기();
 async function 뽑기실행() {
   if (!상태.파일) return;
   v.pause();
-  단계(3);
-  $('뽑기').disabled = true;
-  $('격자').innerHTML = ''; $('미리판').innerHTML = ''; $('상황3').textContent = '장면 뽑는 중 …';
+  const 장면키 = [상태.시작, 상태.끝, 상태.방식, 상태.손장면.length].join('|');
+  상태.장면키 = 장면키; 상태.장면들 = [];
+  $('격자').innerHTML = ''; $('미리판').innerHTML = ''; $('상황3').textContent = '장면 뽑는 중 …'; 요약그리기();
   const 막대 = $('진행').firstElementChild; $('진행').hidden = false; 막대.style.width = '0%';
   try {
     const 뽑은 = await 영상.뽑기(v, { 시작: 상태.시작, 끝: 상태.끝, 방식: 상태.방식, 알림: p => { 막대.style.width = Math.round(p * 100) + '%'; } });
-    const 모두 = [...뽑은, ...상태.손장면].sort((a, b) => a.t - b.t)
+    if (상태.장면키 !== 장면키) return;                     // 그새 구간 · 방식이 바뀜 → 새 뽑기가 이어 함
+    const 손 = 상태.손장면.filter(s => s.t >= 상태.시작 - 0.05 && s.t <= 상태.끝 + 0.05);
+    const 모두 = [...뽑은, ...손].sort((a, b) => a.t - b.t)
       .filter((s, i, 줄) => i === 0 || s.t - 줄[i - 1].t > 0.3);           // 손으로 넣은 것과 겹치면 하나만
     상태.장면들 = 모두.map(s => ({ ...s, 고름: true, 작은: s.그림.toDataURL('image/jpeg', 0.7) }));
     격자그리기();
-    $('상황3').textContent = `장면 ${상태.장면들.length} 뽑음 → 필요 없는 장면은 눌러서 빼기`;
+    $('상황3').textContent = '';
   } catch (e) {
     $('상황3').textContent = '장면을 못 뽑음 → ' + e.message;
   } finally {
-    $('뽑기').disabled = false; $('진행').hidden = true;
+    if (상태.장면키 === 장면키) $('진행').hidden = true;
   }
 }
-
-// ④ 3 장면 고르기 · 보내기 ─────────────────────────────
 const 고른것 = () => 상태.장면들.filter(s => s.고름);
+const 장수 = () => 상태.꼴 === '판' ? Math.ceil(고른것().length / 9) : 고른것().length;
 function 격자그리기() {
   $('격자').innerHTML = '';
   상태.장면들.forEach((s, i) => {
@@ -115,13 +259,14 @@ function 격자그리기() {
 let 미리판때 = 0;
 function 요약그리기() {
   const n = 고른것().length;
-  $('고른수').innerHTML = `장면 ${상태.장면들.length} 중 <b>${n}</b> 고름`;
-  $('판수').textContent = 상태.꼴 === '판' ? `→ 장면판 ${Math.ceil(n / 9)}장` : `→ 그림 ${n}장`;
+  $('고른수').innerHTML = 상태.장면들.length
+    ? `장면 ${상태.장면들.length} 중 <b>${n}</b> 고름 · ${상태.꼴 === '판' ? `한 장에 모아 ${장수()}장` : `따로따로 ${n}장`} → 필요 없는 장면은 눌러서 빼기`
+    : '장면 0';
   $('함께글').value = 영상.함께갈글({ 출처: 상태.출처, 길이: 상태.끝 - 상태.시작, 장수: n, 낱장: 상태.꼴 === '낱장', 물음: $('물음').value });
-  $('보내기').disabled = !n;
-  if (typeof 준비버림 === 'function') 준비버림();     // 고른 장면이 바뀌면 만들어 둔 그림은 버림
+  $('클로드복사').disabled = $('보내기').disabled = !n;
+  준비버림();                                           // 고른 장면이 바뀌면 만들어 둔 그림은 버림
   clearTimeout(미리판때); 미리판때 = setTimeout(미리판그리기, 200);
-  if (typeof 복사줄그리기 === 'function') 복사줄그리기();
+  복사줄그리기();
 }
 function 미리판그리기() {
   $('미리판').innerHTML = '';
@@ -131,12 +276,6 @@ function 미리판그리기() {
   });
 }
 칩고르기('꼴', 값 => { 상태.꼴 = 값; 요약그리기(); });
-$('손으로').onclick = () => {                     // 2 단계 — 영상을 멈춘 자리 한 장을 «꼭 넣을 장면» 으로
-  const t = v.currentTime;
-  if (상태.손장면.some(s => Math.abs(s.t - t) < 0.3)) return;
-  상태.손장면.push({ t, 그림: 영상.한장(v) });
-  $('손수').textContent = `꼭 넣을 장면 ${상태.손장면.length} (${상태.손장면.map(s => 영상.시각(s.t)).join(' · ')})`;
-};
 
 // 앱용 = 갤럭시 문서보기 앱으로 보낼 때 — toBlob 없이 바로 base64 (영상.앱그림 · 10-10 폰에서 멈춤)
 async function 보낼파일들(앱용 = false) {
@@ -151,7 +290,7 @@ const 앱안 = () => !!(window.Android && window.Android.shareMultiBegin);
 // 폰 공유 창은 «누른 손가락» 이 식으면 거절함 (34번 10-03 실측) → 그림을 만드느라 늦어 거절되면
 // 만든 파일을 들고 「보낼 준비 됨 → 한 번 더 누르기」 로 바꿔 두고, 다음 누름에 바로 보냄
 let 보낼준비 = null;
-const 보내기글 = '클로드에게 보내기';
+const 보내기글 = '⇪ 클로드로 공유';
 function 준비버림() { 보낼준비 = null; $('보내기').textContent = 보내기글; }
 $('보내기').onclick = async () => {
   try {
@@ -159,7 +298,7 @@ $('보내기').onclick = async () => {
     const 어떻게 = await 영상.보내기(보낼준비.파일들, 보낼준비.글, 글 => { $('상황3').textContent = 글; });
     준비버림();
     $('상황3').textContent = 어떻게 === '공유'
-      ? '공유 창을 열었음 → 클로드 고르기 · 답이 오면 「4 내용 문서」'
+      ? '공유 창을 열었음 → 클로드 고르기 · 답이 오면 「클로드 답 정리」'
       : '내려받았음 · 함께 갈 글은 복사해 둠 → 클로드에 그림 올리고 글 붙여 넣기';
   } catch (e) {
     if (e.name === 'NotAllowedError' && 보낼준비) {
@@ -178,21 +317,35 @@ $('저장만').onclick = async () => {
   for (const f of 파일들) { 내려받기(f); await new Promise(r => setTimeout(r, 250)); }
   $('상황3').textContent = `그림 ${파일들.length}장 저장함`;
 };
-// 복사해서 붙여 넣기 (10-10 · «카피해서 클로드에 전달» 요청) — 공유 창이 안 뜰 때의 다른 길
-//   폰 클립보드는 한 칸 → 그림 한 장 또는 글 하나씩 : 복사 → 클로드 입력칸 길게 눌러 붙여넣기 → 다음 것
-//   갤럭시 앱 : 문서보기 「복사」 다리(copyBegin/Chunk/End → 클립보드 그림) · 웹 : ClipboardItem(약속을 누른 손가락 안에서 바로)
+// 「📋 복사 → 클로드에 붙여 넣기」 (10-18 · 하나로) — 그림 모두 + 함께 갈 글을 클립보드 한 번에
+//   갤럭시 앱 : copyMulti 다리 (그림 여러 장 + 글) · 웹 : 첫 그림 + 글 (웹 클립보드는 한 칸) → 나머지 그림은 「더 보기」 낱개
+$('클로드복사').onclick = async () => {
+  const 앱 = window.Android;
+  if (앱 && 앱.copyMultiBegin) return 모두복사();
+  if (앱 && 앱.copyBegin) return 그림복사(0);
+  try {
+    if (!navigator.clipboard || !window.ClipboardItem) throw new Error('그림 복사를 못 하는 브라우저 → 「⇪ 클로드로 공유」');
+    const c = 복사할캔버스(0), 글 = $('함께글').value;
+    const 그림 = new Promise((ok, no) => c.toBlob(b => b ? ok(b) : no(new Error('그림을 못 만듦')), 'image/png'));
+    try { await 영상.제한(navigator.clipboard.write([new ClipboardItem({ 'image/png': 그림, 'text/plain': new Blob([글], { type: 'text/plain' }) })]), 15000, '복사'); }
+    catch (e) { await 영상.제한(navigator.clipboard.write([new ClipboardItem({ 'image/png': 그림 })]), 15000, '그림 복사'); }   // 그림 + 글을 한 번에 못 담는 브라우저
+    $('상황3').textContent = 장수() > 1
+      ? `그림 1 + 글 복사함 → 클로드 입력칸에 붙여넣기 · 그림 2~${장수()} 는 「더 보기」 에서 하나씩`
+      : '그림 + 글 복사함 → 클로드 입력칸 길게 눌러 붙여넣기';
+  } catch (e) { $('상황3').textContent = '복사 못 함 → ' + e.message; }
+};
+// 낱개 복사 줄 (「더 보기」 안) — 클립보드에 한 번에 하나씩 : 복사 → 붙여넣기 → 다음 것
 function 복사줄그리기() {
-  const n = 고른것().length, 장수 = 상태.꼴 === '판' ? Math.ceil(n / 9) : n;
-  $('복사줄').innerHTML = n ? '복사해서 붙여 넣기 :' : '';
+  const n = 고른것().length;
+  $('복사줄').innerHTML = n ? '하나씩 복사 :' : '';
   if (!n) return;
   const 단추 = (글, 할일) => { const b = document.createElement('button'); b.textContent = 글; b.onclick = 할일; $('복사줄').appendChild(b); };
-  if (장수 > 1 && window.Android && window.Android.copyMultiBegin) 단추(`📋 모두 (그림 ${장수} + 글)`, 모두복사);
   단추('📋 글', 글복사);
-  for (let i = 0; i < 장수; i++) 단추(`📋 그림 ${i + 1}`, () => 그림복사(i));
+  for (let i = 0; i < 장수(); i++) 단추(`📋 그림 ${i + 1}`, () => 그림복사(i));
 }
-// 📋 모두 (10-10) — 갤럭시 앱만 : 클립보드 한 칸에 그림 여러 장 + 글 (붙여 넣는 앱이 첫 장만 받으면 낱개 단추로)
+// 갤럭시 앱 — 클립보드 한 칸에 그림 여러 장 + 글 (붙여 넣는 앱이 첫 장만 받으면 「더 보기」 낱개로)
 async function 모두복사() {
-  const 앱 = window.Android, n = 상태.꼴 === '판' ? Math.ceil(고른것().length / 9) : 고른것().length;
+  const 앱 = window.Android, n = 장수();
   try {
     $('상황3').textContent = `그림 ${n}장 복사하는 중 …`; await 쉼(30);
     if (!앱.copyMultiBegin()) throw new Error('파일을 못 만듦');
@@ -203,8 +356,8 @@ async function 모두복사() {
       for (let k = 0; k < b64.length; k += 글크기) if (!앱.copyChunk(b64.slice(k, k + 글크기))) throw new Error('쓰기 실패 (폰 저장 공간?)');
     }
     if (!앱.copyMultiEnd($('함께글').value)) throw new Error('클립보드에 못 넣음');
-    $('상황3').textContent = `그림 ${n}장 + 글 복사함 → 클로드 입력칸 길게 눌러 붙여넣기 (한 장만 들어가면 아래 낱개 단추로)`;
-  } catch (e) { $('상황3').textContent = '모두 복사 못 함 → ' + e.message; }
+    $('상황3').textContent = `그림 ${n}장 + 글 복사함 → 클로드 입력칸 길게 눌러 붙여넣기 (한 장만 들어가면 「더 보기」 에서 하나씩)`;
+  } catch (e) { $('상황3').textContent = '복사 못 함 → ' + e.message; }
 }
 function 복사할캔버스(i) {
   const 고른 = 고른것();
@@ -234,7 +387,7 @@ async function 그림복사(i) {
       if (!앱.copyEnd()) throw new Error('클립보드에 못 넣음');
       $('상황3').textContent = 다; return;
     }
-    if (!navigator.clipboard || !window.ClipboardItem) throw new Error('그림 복사를 못 하는 브라우저 → 「저장만」');
+    if (!navigator.clipboard || !window.ClipboardItem) throw new Error('그림 복사를 못 하는 브라우저 → 「💾 그림 저장」');
     const 약속 = new Promise((ok, no) => c.toBlob(b => b ? ok(b) : no(new Error('그림을 못 만듦')), 'image/png'));
     await 영상.제한(navigator.clipboard.write([new ClipboardItem({ 'image/png': 약속 })]), 15000, '그림 복사');
     $('상황3').textContent = 다;
@@ -242,7 +395,7 @@ async function 그림복사(i) {
 }
 $('다음4').onclick = () => { 단계(4); 문서그리기(); $('답').focus(); };
 
-// ⑤ 4 내용 문서 ────────────────────────────────────────
+// ⑥ 클로드 답 정리 ─────────────────────────────────────
 const 출처줄 = () => (상태.파일 ? `${상태.출처} · ${영상.시각(상태.끝 - 상태.시작)} · ` : '클로드 답 · ') + `${영상.오늘()} 정리 · DSM 문서보기`;
 const 지금md = () => 영상.마크다운({ 제목: $('제목').value.trim(), 출처줄: 출처줄(), 본문: $('답').value });
 const 파일이름 = 꼬리 => ($('제목').value.trim() || '내용 정리').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60) + 꼬리;
@@ -284,10 +437,10 @@ $('문서보내기').onclick = async () => {
   } catch (e) { $('상황4').textContent = e.name === 'AbortError' ? '보내기를 닫았음' : '못 보냄 → ' + e.message; }
 };
 
-// ⑥ 갤럭시 문서보기 앱 안에서 (34번에 실렸을 때) ─────────────
-//   · 「영상 가져오기」 → 앱의 파일 고르기(Android.pickFile) → 껍데기가 앱 안에 복사하고 앱.받음() 을 부름
+// ⑦ 갤럭시 문서보기 앱 안에서 (34번에 실렸을 때) ─────────────
+//   · 「영상 열기」 → 앱의 파일 고르기(Android.pickFile) → 껍데기가 앱 안에 복사하고 앱.받음() 을 부름
 //   · video/index.html?doc=<id>&name=…  → 받은 영상(갤러리 「공유」 · 목록에서 누름)을 바로 엶
-//   · video/index.html?text=1          → 클로드 앱에서 「공유」 한 답 글을 4 단계에 넣음
+//   · video/index.html?text=1          → 클로드 앱에서 「공유」 한 답 글을 「클로드 답 정리」 에 넣음
 const 주소값 = new URLSearchParams(location.search);
 async function 받은영상열기(id, 이름) {
   const 주소 = window.Android ? `/doc/${encodeURIComponent(id)}` : `../doc/${encodeURIComponent(id)}`;   // 웹앱은 일꾼(sw.js)이 보관함에서 내줌
@@ -311,8 +464,8 @@ if (window.Android && window.Android.pickFile) {
   };
 }
 
-// ⑦ 시험 걸쇠 — 영상.html?시험=1 이면 3_시험\시험.js 를 불러 저절로 돌림
-window.화면 = { 상태, 단계, 가져오기, 뽑기실행, 격자그리기, 요약그리기, 보낼파일들, 지금md, 문서그리기 };
+// ⑧ 시험 걸쇠 — 영상.html?시험=1 이면 3_시험\시험.js 를 불러 저절로 돌림
+window.화면 = { 상태, 단계, 가져오기, 뽑기실행, 격자그리기, 요약그리기, 보낼파일들, 지금md, 문서그리기, 구간바꿈, 옮기기시작, 영상만들기, 자르기그림 };
 단계(1);
 if (주소값.get('doc')) 받은영상열기(주소값.get('doc'), 주소값.get('name'));
 if (주소값.get('text') && window.Android && window.Android.takeSharedText) {

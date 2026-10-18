@@ -47,18 +47,41 @@ textarea,input[type=text]{width:100%;border:0;border-radius:12px;background:var(
 .놓는곳 small{font-size:13px;line-height:1.6}
 .놓는곳.위{border-color:var(--c);color:var(--c)}
 /* 2 자르기 */
-video{width:100%;max-height:46vh;background:#000;border-radius:12px}
-.자르기{position:relative;height:34px}
-.자르기 .띠{position:absolute;left:0;right:0;top:13px;height:8px;border-radius:4px;background:var(--chip)}
-.자르기 .쓸{position:absolute;top:13px;height:8px;border-radius:4px;background:var(--c)}
-.자르기 input{position:absolute;left:0;top:0;width:100%;height:34px;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}
-.자르기 input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--card);box-shadow:0 1px 4px rgba(0,0,0,.35);border:3px solid var(--c)}
-.자르기 input::-moz-range-thumb{pointer-events:auto;width:20px;height:20px;border-radius:50%;background:var(--card);border:3px solid var(--c)}
-.시각들{display:flex;justify-content:space-between;font-size:13px;color:var(--dim)}
+video{width:100%;max-height:38vh;background:#000;border-radius:12px}
+/* 2 구간 자르기 (10-18) — 그림 띠 위 손잡이 둘 · 손가락으로 끎 (손잡이 둘레 넉넉히 잡힘) */
+.띠그림{position:relative;height:60px;margin:0 14px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:ew-resize}
+.띠칸{position:absolute;inset:0;display:flex;border-radius:8px;overflow:hidden;background:#2c2c2e}
+.띠칸 img{flex:1;min-width:0;height:100%;object-fit:cover;display:block}
+.가림{position:absolute;top:0;bottom:0;background:rgba(0,0,0,.55);pointer-events:none}
+#가림앞{left:0;border-radius:8px 0 0 8px}#가림뒤{right:0;border-radius:0 8px 8px 0}
+.고른틀{position:absolute;top:-3px;bottom:-3px;border:3px solid var(--c);border-radius:6px;pointer-events:none;box-sizing:content-box;border-left-width:14px;border-right-width:14px}   /* 자리 = calc(시작% − 14px) · 폭 = 구간% → 안쪽이 딱 구간 */
+.고른틀::before,.고른틀::after{content:"";position:absolute;top:50%;margin-top:-8px;width:3px;height:16px;background:#fff;border-radius:2px}
+.고른틀::before{left:-9px}.고른틀::after{right:-9px}
+.재생선{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 2px #000;pointer-events:none}
+.시각{display:flex;justify-content:space-between;font-size:13px;color:var(--dim)}
+.시각 b{color:var(--ink);font-weight:700}
+.다듬{display:grid;grid-template-columns:44px repeat(5,1fr);gap:5px;align-items:center}
+.다듬 span{font-size:13px;color:var(--dim);font-weight:600}
+.다듬 button{border:0;border-radius:10px;padding:9px 0;background:var(--chip);color:var(--ink);font-size:13px;font-weight:600}
+.다듬 button.여기{background:var(--c2);color:var(--c)}
+.더보기{border-top:1px solid var(--line);padding-top:6px}
+.더보기 summary{font-size:13px;color:var(--dim);font-weight:600;cursor:pointer;padding:4px 0}
+.더보기[open]{display:flex;flex-direction:column;gap:8px}
+/* 3 옮기기 — 갈래 둘 · 갈래마다 큰 단추 하나 */
+.갈래{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.갈래 h3{margin:0;font-size:15px}
+.갈래 h3 small{font-size:13px;color:var(--dim);font-weight:500;margin-left:4px}
+.세단추{display:flex;gap:6px}   /* 영상 복사가 없는 곳(웹)은 둘이 반씩 */
+.세단추 button{flex:1;border:0;border-radius:12px;padding:9px 2px;background:var(--chip);color:var(--ink);font-size:13px;font-weight:600;line-height:1.3}
+.세단추 button[hidden]{display:none}
+.세단추 em{display:block;font-style:normal;font-size:17px}
+.세단추 .주색{background:var(--c);color:var(--cink)}
+.세단추 button:disabled,.보조:disabled{opacity:.45;cursor:default}
+.진행[hidden]{display:none}
 /* 3 장면 고르기 */
 .진행{height:6px;border-radius:3px;background:var(--chip);overflow:hidden}
 .진행 b{display:block;height:100%;width:0;background:var(--c);transition:width .15s}
-.격자{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.격자{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}   /* 넷이면 «번호 · 시각» 딱지가 잘림 (10-18 폰 너비) */
 .장면{position:relative;border:0;padding:0;border-radius:9px;overflow:hidden;background:#000}
 .장면 img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover}   /* 폰 녹화 비율 — 아래 자막이 안 잘리게 */
 .장면 b{position:absolute;left:5px;top:5px;font-size:13px;color:#fff;background:var(--c);border-radius:6px;padding:0 6px;line-height:20px}   /* 장면판과 같은 왼쪽 위 딱지 — 자막을 안 가림 */
