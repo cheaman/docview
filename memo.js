@@ -61,9 +61,10 @@ function 메모다시(m) {
 // 새 메모 · 고치기 판
 function 새메모(k, x, y) {
   const 기본 = k === 'd' ? 메모기본.도면 : 메모기본.쪽;
-  메모편집판({ id: Date.now().toString(36), k, x, y, w: 기본.w, f: 기본.f, 글: '', 숨김: false }, true);
+  const 옮김 = 쪽지옮길글; 쪽지옮길글 = null;           // 쪽지 판 「📍 그림 위 메모로」 (10-21) — 쓴 글을 채워 엶
+  메모편집판({ id: Date.now().toString(36), k, x, y, w: 기본.w, f: 기본.f, 글: 옮김?.글 || '', 숨김: false }, true, 옮김);
 }
-function 메모편집판(m, 새것) {
+function 메모편집판(m, 새것, 옮김) {
   const 쪽 = m.k !== 'd';
   판열기(`<h3>📝 메모${쪽 && 지금?.쪽수 ? ` · ${Number(m.k) + 1}쪽` : ''}</h3>
     <textarea id="memoNote" rows="4" maxlength="5000" placeholder="이 자리에 남길 말"></textarea>
@@ -87,6 +88,7 @@ function 메모편집판(m, 새것) {
     Object.assign(m, { 글: 새글, 숨김, f });
     if (새것 && !메모들().includes(m)) 메모들().push(m);
     표시저장(); 메모다시(m); 판닫기();
+    if (옮김?.글) 쪽지에서뺌(옮김);
   };
   if ($('#메모지움')) $('#메모지움').onclick = () => { 메모빼기(m); 판닫기(); };
   setTimeout(() => { 칸.focus(); 칸.setSelectionRange(칸.value.length, 칸.value.length); }, 60);

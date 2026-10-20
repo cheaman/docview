@@ -774,21 +774,41 @@ $('#gq').addEventListener('input', () => { clearTimeout(찾기그림시계); 찾
 $('#gq').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#gq').blur(); 찾기그리기(); } });
 
 // ②-2 문서 쪽지 (v0.6) — 문서마다 글 메모 하나 · 원본은 안 고침 · 껍데기 recent.json 줄의 「메모」 칸
+// 10-21 : 그림 · PDF · 도면을 보는 중이면 «그림 위 자리 메모» 로 옮기는 단추 · 안내 (사용자 요청 — 쪽지를 위치 메모로 알고 씀)
+let 쪽지옮길글 = null;    // { 글, 쪽지 } — 다음 새 메모에 채워 넣을 글 · 옮기기 전 쪽지
 function 쪽지판(d) {
+  const 자리메모됨 = 지금?.id === d.id && !!(지금.쪽수 || 지금.그림 || 도면판);
   판열기(`<h3>📝 쪽지 · ${글(d.name)}</h3>
     <textarea id="memoin" rows="5" maxlength="20000" placeholder="이 문서에 남길 메모 → 다음에 열면 맨 위에 보임"></textarea>
+    ${자리메모됨 ? '<div class="row 쪽지안내"><div class="흐림">문서 전체 메모 · 보낼 때 그림 아래 띠로<br>그림 위 자리에 → 펜 → 메모</div><button class="btn plain" id="memopin">📍 그림 위 메모로</button></div>' : ''}
     <div class="row 끝줄">${d.메모 ? '<button class="btn plain warn" id="memodel">쪽지 지우기</button>' : ''}<span style="flex:1"></span><button class="btn plain" onclick="판닫기()">닫기</button><button class="btn" id="memosave">저장</button></div>`);
   const 칸 = $('#memoin'); 칸.value = d.메모 || '';
-  const 저장 = 새 => {
+  const 저장 = (새, 닫기 = true) => {
     새 = 새.replace(/\s+$/, '');
     다리.setInfo(d.id, '메모', 새);
     d.메모 = 새 || undefined;
     if (지금?.id === d.id) { 지금.d.메모 = d.메모; 쪽지보이기(); }
-    판닫기(); 목록그리기();
+    if (닫기) 판닫기();
+    목록그리기();
   };
   $('#memosave').onclick = () => 저장(칸.value);
   if ($('#memodel')) $('#memodel').onclick = () => 저장('');
+  if ($('#memopin')) $('#memopin').onclick = () => {   // 쓴 글을 들고 펜 「메모」 로 → 톡한 자리에 메모 · 저장하면 쪽지에서는 빠짐 (memo.js)
+    쪽지옮길글 = { 글: 칸.value.replace(/\s+$/, ''), 쪽지: d.메모 || '' };
+    판닫기();
+    if (!펜.켬) $('#pen').click();
+    $('#penbar [data-m="메모"]').click();
+    칩(쪽지옮길글.글 ? '쪽지 글을 넣을 곳을 톡' : '메모 넣을 곳을 톡');
+  };
   setTimeout(() => { 칸.focus(); 칸.setSelectionRange(칸.value.length, 칸.value.length); }, 60);
+}
+function 쪽지에서뺌(옮김) {                          // 그림 위 메모로 옮긴 뒤 — 쪽지가 옮긴 글 그대로면 비움 · 고쳐 썼으면 그대로 둠
+  const d = 지금?.d; if (!d || (d.메모 || '') !== 옮김.쪽지) return;
+  const 남음 = 옮김.쪽지 === 옮김.글 ? '' : 옮김.쪽지;
+  if (남음 === (d.메모 || '')) return;
+  다리.setInfo(d.id, '메모', 남음); d.메모 = 남음 || undefined;
+  const 줄 = 목록.find(x => x.id === d.id); if (줄) 줄.메모 = d.메모;
+  쪽지보이기(); 목록그리기();
 }
 function 쪽지보이기(접음) {
   const m = 지금?.d?.메모 || '';
@@ -2010,18 +2030,18 @@ async function 지금그림캔버스(자름) {
     const n = 보는쪽(), pg = $('#pages').children[n], pw = +pg.dataset.pw;
     const 몫 = 자름 ? Math.max(0.25, Math.max(자름.x1 - 자름.x0, 자름.y1 - 자름.y0)) : 1;   // 작게 고를수록 크게 그려 글씨가 안 뭉개지게 (긴 변 2800 까지)
     const 주소 = await 쪽길().쪽(id, n, Math.round(Math.min(자름 ? 2800 : 2000, Math.max(800, pw * 2 / 몫)))), im = await 보내기.그림받기(주소); 그림주소놓기(주소);
-    c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽[n], d.메모);
+    c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽[n]);
     보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === String(n)), { 돌: 지금.돌림, 번호표, 쪽: n + 1 });
   } else if (지금.그림) {
-    c = 보내기.쪽캔버스($('#pages .pg img'), 지금.돌림, 지금.표시.쪽['0'], d.메모);
+    c = 보내기.쪽캔버스($('#pages .pg img'), 지금.돌림, 지금.표시.쪽['0']);
     보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === '0'), { 돌: 지금.돌림, 번호표 });
   } else if (도면판) {
     c = 도면판.내보내기(false);
     보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === 'd'), { 도면: c.점, 배율: c.배율, 번호표 });
-    if (d.메모) 보내기.쪽지상자(c.getContext('2d'), c.width, d.메모);
   }
   if (c && 자름) c = 잘라내기(c, 자름);
-  if (c && 번호표.목록.length) c = 보내기.아래목록(c, 번호표.목록);
+  const 쪽지 = 자름 ? '' : d.메모;                    // 문서 쪽지는 아래 띠로 (10-21 · 그림을 가리던 것) · 골라 복사엔 안 붙임
+  if (c && (번호표.목록.length || 쪽지)) c = 보내기.아래목록(c, 번호표.목록, 쪽지);
   return c;
 }
 function 잘라내기(c, r) {
@@ -2228,10 +2248,12 @@ async function 사본보내기(k) {
         const pg = $('#pages').children[n], pw = +pg.dataset.pw, ph = +pg.dataset.ph;
         const w = Math.round(Math.min(2000, Math.max(800, pw * 2)));          // 1pt = 2화소 (144 dpi)
         const 주소 = await 쪽길().쪽(id, n, w), im = await 보내기.그림받기(주소); 그림주소놓기(주소);
-        const c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽[n], i === 0 ? d.메모 : null);
+        let c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽[n]);
         보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === String(n)), { 돌: 지금.돌림, 번호표, 쪽: n + 1 });
-        const jpg = await 보내기.바이트(c, 'image/jpeg', 0.85);
-        결과.push({ jpg, w: c.width, h: c.height, pw: 지금.돌림 & 1 ? ph : pw, ph: 지금.돌림 & 1 ? pw : ph });
+        const 원높 = c.height;
+        if (i === 0 && d.메모 && k !== '이쪽') c = 보내기.아래목록(c, [], d.메모);   // 첫 쪽 아래에 쪽지 띠 (10-21) — 쪽 높이도 그만큼
+        const jpg = await 보내기.바이트(c, 'image/jpeg', 0.85), 늘 = c.height / 원높;
+        결과.push({ jpg, w: c.width, h: c.height, pw: 지금.돌림 & 1 ? ph : pw, ph: (지금.돌림 & 1 ? pw : ph) * 늘 });
         c.width = c.height = 0;
       }
       if (번호표.목록.length && k !== '이쪽') {           // 숨김 메모는 맨 끝에 「메모 목록」 쪽 (A4)
@@ -2241,27 +2263,26 @@ async function 사본보내기(k) {
       }
       if (k === '이쪽') {
         let jpg = 결과[0].jpg;
-        if (번호표.목록.length) {                         // 그림 하나 — 목록을 아래에 붙임
+        if (번호표.목록.length || d.메모) {               // 그림 하나 — 쪽지 · 목록을 아래에 붙임
           const im2 = await 보내기.그림받기(URL.createObjectURL(new Blob([jpg], { type: 'image/jpeg' })));
-          jpg = await 보내기.바이트(보내기.아래목록(im2, 번호표.목록), 'image/jpeg', 0.88);
+          jpg = await 보내기.바이트(보내기.아래목록(im2, 번호표.목록, d.메모), 'image/jpeg', 0.88);
         }
         await 보내기.넘기기(`${밑}_${쪽들[0] + 1}쪽.jpg`, 'image/jpeg', jpg);
       }
       else await 보내기.넘기기(`${밑}_표시.pdf`, 'application/pdf', 보내기.PDF(결과));
     } else if (지금.그림) {
       const im = $('#pages .pg img');
-      let c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽['0'], d.메모);
+      let c = 보내기.쪽캔버스(im, 지금.돌림, 지금.표시.쪽['0']);
       const 번호표 = { n: 0, 목록: [] };
       보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === '0'), { 돌: 지금.돌림, 번호표 });
-      if (번호표.목록.length) c = 보내기.아래목록(c, 번호표.목록);
+      if (번호표.목록.length || d.메모) c = 보내기.아래목록(c, 번호표.목록, d.메모);
       const png = ['png', 'gif', 'bmp', 'webp'].includes(지금.ext);
       await 보내기.넘기기(`${밑}_표시.${png ? 'png' : 'jpg'}`, png ? 'image/png' : 'image/jpeg', await 보내기.바이트(c, png ? 'image/png' : 'image/jpeg', 0.9));
     } else if (도면판) {
       let c = 도면판.내보내기(k === '도면전체');
       const 번호표 = { n: 0, 목록: [] };
       보내기.메모그리기(c, (지금.표시.메모 || []).filter(m => m.k === 'd'), { 도면: c.점, 배율: c.배율, 번호표 });
-      if (d.메모) 보내기.쪽지상자(c.getContext('2d'), c.width, d.메모);
-      if (번호표.목록.length) c = 보내기.아래목록(c, 번호표.목록);
+      if (번호표.목록.length || d.메모) c = 보내기.아래목록(c, 번호표.목록, d.메모);
       await 보내기.넘기기(`${밑}_표시.png`, 'image/png', await 보내기.바이트(c, 'image/png'));
     }
     $('#chip').hidden = true;

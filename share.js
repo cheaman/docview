@@ -1,5 +1,5 @@
 // 보내기 — 표시 입힌 사본 만들기 (v0.7 · 2026-10-03 전무님 「보던 문서를 저장한 후 다시 공유」 → 「표시 입힌 사본 공유」 고르심)
-// 원본은 안 고친다. 보이는 그대로(돌린 방향 · 펜 표시 · 첫 쪽에 쪽지)를 그림으로 떠서
+// 원본은 안 고친다. 보이는 그대로(돌린 방향 · 펜 표시)를 그림으로 떠서 · 쪽지는 첫 쪽 아래 띠로 (10-21)
 //   PDF 는 쪽마다 JPEG 를 붙인 새 PDF 로, 그림 · 도면은 그림 파일 하나로 → 껍데기(shareBegin · Chunk · End)가 카톡 · 메일 고르는 창을 띄움
 // 구역 지도 : ① 쪽 하나 → 캔버스 ② 쪽지 상자 ③ PDF 묶기 ④ 껍데기로 넘기기
 'use strict';
@@ -11,7 +11,7 @@ const 보내기 = {};
 });
 
 // ① 쪽 하나 — 안 돌린 원래 쪽(그림)에 펜 획(0~1 좌표)을 긋고, 보이는 방향으로 돌린 캔버스
-보내기.쪽캔버스 = function (im, 돌, 획들, 쪽지) {
+보내기.쪽캔버스 = function (im, 돌, 획들) {
   const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
   const c = document.createElement('canvas');
   c.width = 돌 & 1 ? h : w; c.height = 돌 & 1 ? w : h;
@@ -44,32 +44,10 @@ const 보내기 = {};
   }
   (획들 || []).filter(획 => !형광인가(획.c)).forEach(획 => 긋기(x, 획));
   x.restore();
-  if (쪽지) 보내기.쪽지상자(x, c.width, 쪽지);
   return c;
 };
 
-// ② 쪽지 — 왼쪽 위에 노란 상자 (열두 줄까지)
-보내기.쪽지상자 = function (x, W, 글) {
-  const 크기 = Math.max(14, Math.round(W * 0.02)), 여백 = Math.round(크기 * 0.8), 폭 = Math.round(W * 0.62);
-  x.save();
-  x.font = `${크기}px system-ui, 'Noto Sans KR', sans-serif`; x.textBaseline = 'top';
-  const 줄들 = [];
-  for (const 문단 of ('📝 ' + 글).split('\n')) {
-    let 줄 = '';
-    for (const 자 of 문단) {
-      if (x.measureText(줄 + 자).width > 폭 - 여백 * 2 && 줄) { 줄들.push(줄); 줄 = 자; } else 줄 += 자;
-    }
-    줄들.push(줄);
-    if (줄들.length >= 12) break;
-  }
-  if (줄들.length > 12) { 줄들.length = 12; 줄들[11] += ' …'; }
-  const 높 = 줄들.length * 크기 * 1.45 + 여백 * 2, 왼 = Math.round(W * 0.03), 위 = 왼;
-  x.fillStyle = 'rgba(255,244,194,0.96)'; x.strokeStyle = '#e6c95a'; x.lineWidth = Math.max(1, 크기 / 12);
-  x.beginPath(); x.roundRect ? x.roundRect(왼, 위, 폭, 높, 크기 * 0.5) : x.rect(왼, 위, 폭, 높); x.fill(); x.stroke();
-  x.fillStyle = '#3d3200';
-  줄들.forEach((s, k) => x.fillText(s, 왼 + 여백, 위 + 여백 + k * 크기 * 1.45));
-  x.restore();
-};
+// ② 쪽지 — 그림을 가리지 않게 아래 띠로 붙임 (10-21 · 보내기.아래목록)
 
 보내기.바이트 = (c, 꼴, 질) => new Promise((ok, no) => c.toBlob(b => b ? b.arrayBuffer().then(a => ok(new Uint8Array(a))) : no(new Error('그림 만들기 실패 (메모리)')), 꼴, 질));
 
@@ -189,19 +167,26 @@ const 동그라미수 = n => (n <= 20 ? String.fromCharCode(0x245f + n) : `(${n}
   }
   return 쪽들;
 };
-보내기.아래목록 = function (그림, 목록) {              // 그림 · 도면 — 아래로 늘려 목록 띠를 붙임
+보내기.아래목록 = function (그림, 목록, 쪽지) {        // 그림 · 도면 · 쪽 — 아래로 늘려 띠를 붙임 : 「📝 쪽지」(문서 쪽지 · 10-21 그림 위에 덮던 것) + 「📝 메모」(숨김 메모 목록)
   const W = 그림.naturalWidth || 그림.width, H0 = 그림.naturalHeight || 그림.height;
-  const 글씨 = Math.max(16, Math.round(W * 0.032)), 여백 = 글씨, 사이 = 글씨 * 1.5;
+  const 글씨 = Math.max(16, Math.round(W * 0.032)), 여백 = 글씨, 사이 = 글씨 * 1.5, 머리 = 글씨 * 1.8;
   const 잼 = document.createElement('canvas').getContext('2d'); 잼.font = `${글씨}px system-ui, 'Noto Sans KR', sans-serif`;
-  const 줄들 = 보내기.목록줄(잼, 목록, W - 여백 * 2);
-  const c = document.createElement('canvas'); c.width = W; c.height = Math.round(H0 + 여백 * 2 + 글씨 * 1.8 + 줄들.length * 사이);
+  const 묶음 = [];
+  if (쪽지) 묶음.push({ 제목: '📝 쪽지', 줄들: 보내기.줄나누기(잼, 쪽지, W - 여백 * 2, 30).map(s => ({ s, 첫: true })) });
+  if (목록?.length) 묶음.push({ 제목: '📝 메모', 줄들: 보내기.목록줄(잼, 목록, W - 여백 * 2) });
+  const c = document.createElement('canvas'); c.width = W;
+  c.height = Math.round(H0 + 여백 * 2 + 묶음.reduce((a, b, k) => a + 머리 + b.줄들.length * 사이 + (k ? 여백 : 0), 0));
   const x = c.getContext('2d');
   x.fillStyle = '#fffbea'; x.fillRect(0, 0, W, c.height); x.drawImage(그림, 0, 0, W, H0);
   x.fillStyle = '#e0bf3e'; x.fillRect(0, H0, W, Math.max(2, 글씨 / 8));
-  x.textBaseline = 'top'; x.fillStyle = '#191f28'; x.font = `700 ${글씨 * 1.1}px system-ui, 'Noto Sans KR', sans-serif`;
-  x.fillText('📝 메모', 여백, H0 + 여백);
-  x.font = `${글씨}px system-ui, 'Noto Sans KR', sans-serif`;
-  let y = H0 + 여백 + 글씨 * 1.8;
-  for (const 줄 of 줄들) { x.fillStyle = 줄.첫 ? '#191f28' : '#3a4250'; x.fillText(줄.s, 여백, y); y += 사이; }
+  x.textBaseline = 'top';
+  let y = H0 + 여백;
+  묶음.forEach((b, k) => {
+    if (k) y += 여백;
+    x.fillStyle = '#191f28'; x.font = `700 ${글씨 * 1.1}px system-ui, 'Noto Sans KR', sans-serif`;
+    x.fillText(b.제목, 여백, y); y += 머리;
+    x.font = `${글씨}px system-ui, 'Noto Sans KR', sans-serif`;
+    for (const 줄 of b.줄들) { x.fillStyle = 줄.첫 ? '#191f28' : '#3a4250'; x.fillText(줄.s, 여백, y); y += 사이; }
+  });
   return c;
 };
