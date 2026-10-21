@@ -95,14 +95,81 @@ function 개체요소읽기(몸, 맨위) {                           // 맨 위 
   const q = 맨위 ? 8 : 4, v = 몸보기(몸);
   if (몸.length < q + 44) return null;
   const 이름 = String.fromCharCode(몸[3], 몸[2], 몸[1], 몸[0]);
-  const w0 = v.getUint32(q + 12, true), h0 = v.getUint32(q + 16, true), n = v.getUint16(q + 42, true);
+  const w0 = v.getUint32(q + 12, true), h0 = v.getUint32(q + 16, true), w1 = v.getUint32(q + 20, true), h1 = v.getUint32(q + 24, true), n = v.getUint16(q + 42, true);
   let M = [1, 0, 0, 0, 1, 0];
   for (let j = 0; j < 1 + 2 * n; j++) {
     const o = q + 44 + 48 * j; if (o + 48 > 몸.length) break;
     M = 행렬곱(M, [0, 1, 2, 3, 4, 5].map(k => v.getFloat64(o + 8 * k, true)));
   }
-  return { 이름, w0, h0, M };
+  // 그린 도형 (10-22) — 행렬 뒤 : 선 정보 13바이트 (색 · 굵기 · 성질(0~5비트 선 종류 · 0 없음) · 끝 모양) + 채우기 (종류 1 = 면 색 · 배경색 맨 윗바이트 ff = 없음)
+  let 선 = null, 채움 = null, 무늬 = null;
+  const 뒤 = q + 44 + 48 * (1 + 2 * n);
+  if (그린도형.has(이름) && 몸.length >= 뒤 + 21) {
+    const 색 = v.getUint32(뒤, true), 굵기 = v.getInt32(뒤 + 4, true), 종류 = v.getUint32(뒤 + 8, true) & 0x3f;
+    if (종류) 선 = { 색: 색깔(색), 굵기, 종류 };
+    if (v.getUint32(뒤 + 13, true) & 1) {               // 면 색 · 무늬(빗금 · -1 없음 · 0 ─ 1 │ 2 / 3 \ 4 + 5 ×)
+      const 배경 = v.getUint32(뒤 + 17, true), 무늬색 = v.getUint32(뒤 + 21, true), 무늬종류 = 몸.length >= 뒤 + 29 ? v.getInt32(뒤 + 25, true) : -1;
+      if (배경 >>> 24 !== 0xff && (배경 & 0xffffff) !== 0xffffff) 채움 = 색깔(배경);   // 흰 면은 바탕과 같음 → 안 칠함 (밤 보기에 흰 상자 안 생기게)
+      if (무늬종류 >= 0 && 무늬종류 <= 5) 무늬 = { 색: 색깔(무늬색), 종류: 무늬종류 };
+    }
+  }
+  return { 이름, w0, h0, w1, h1, M, 선, 채움, 무늬 };
 }
+const 그린도형 = new Set(['$lin', '$rec', '$ell', '$pol', '$cur', '$arc']);
+const 색깔 = c => `rgb(${c & 255},${(c >> 8) & 255},${(c >> 16) & 255})`;   // COLORREF (BGR)
+// 모양 꼬리표 (78 선 · 79 네모 · 80 타원 · 82 다각형 · 83 곡선) → 제 크기(w0 × h0) 안 SVG 모양 하나
+//   c = { 이름 ($lin $rec $ell $pol $cur), w0, h0, 선 { 색, 굵기, 종류 }, 채움, 무늬 { 색, 종류 }, 몸 (옛 한글 꼬리표) 또는 끝 · 점 (HWPX) · 곡률 }
+function 도형모양(c, 무늬id) {
+  if (!c.선 && !c.채움 && !c.무늬) return null;
+  const NS = 'http://www.w3.org/2000/svg', v = c.몸 ? 몸보기(c.몸) : null;
+  const 점들 = (o, n) => { if (c.점) return c.점.map(p => p.join(',')).join(' '); const a = []; for (let k = 0; k < n && o + 8 * k + 8 <= c.몸.length; k++) a.push(v.getInt32(o + 8 * k, true) + ',' + v.getInt32(o + 8 * k + 4, true)); return a.join(' '); };
+  let e;
+  if (c.이름 === '$lin') {
+    e = document.createElementNS(NS, 'line');
+    const [x1, y1, x2, y2] = c.끝 || (v && c.몸.length >= 16 ? [0, 4, 8, 12].map(o => v.getInt32(o, true)) : [0, 0, c.w0, c.h0]);
+    Object.entries({ x1, y1, x2, y2 }).forEach(([k, x]) => e.setAttribute(k, x));
+  } else if (c.이름 === '$ell') {
+    e = document.createElementNS(NS, 'ellipse');
+    e.setAttribute('cx', c.w0 / 2); e.setAttribute('cy', c.h0 / 2); e.setAttribute('rx', c.w0 / 2); e.setAttribute('ry', c.h0 / 2);
+  } else if (c.이름 === '$rec') {
+    e = document.createElementNS(NS, 'rect');
+    e.setAttribute('width', c.w0); e.setAttribute('height', c.h0);
+    const 곡률 = c.곡률 ?? c.몸?.[0] ?? 0; if (곡률) e.setAttribute('rx', Math.min(c.w0, c.h0) / 2 * Math.min(곡률, 50) / 50);
+  } else if ((c.이름 === '$pol' || c.이름 === '$cur') && (c.점 || (v && c.몸.length >= 4))) {
+    const n = c.점 ? c.점.length : v.getInt32(0, true); if (!(n > 1 && n < 10000)) return null;
+    e = document.createElementNS(NS, c.채움 || c.무늬 ? 'polygon' : 'polyline');
+    e.setAttribute('points', 점들(4, n));
+  } else return null;
+  e.setAttribute('fill', c.무늬 && 무늬id ? `url(#${무늬id})` : c.채움 || 'none');
+  if (c.선) {
+    e.setAttribute('stroke', c.선.색 === 'rgb(0,0,0)' ? 'currentColor' : c.선.색);   // 검은 선은 글자색 따라 (밤 보기)
+    e.setAttribute('stroke-width', Math.max(1, c.선.굵기 / 75).toFixed(2));
+    if (c.선.종류 > 1) e.setAttribute('stroke-dasharray', c.선.종류 === 3 ? '2 2' : '6 3');
+  } else e.setAttribute('stroke', 'none');
+  e.setAttribute('vector-effect', 'non-scaling-stroke');
+  return e;
+}
+// 도형 여럿을 한 판 SVG 로 — 판 좌표(W × H) 안에 각자 행렬 M 으로 · 판 크기에 맞춰 늘어남
+function 도형판(조각들, W, H, 반) {
+  const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 반); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('preserveAspectRatio', 'none');
+  for (const c of 조각들) {
+    let 무늬id = null;
+    if (c.무늬) {                                       // 빗금 — 판 좌표(HWPUNIT)로 600 ≈ 8화소 간격 · 면 색이 있으면 밑에 깖
+      무늬id = '도형무늬' + (++도형무늬수);
+      const pat = document.createElementNS(NS, 'pattern'), 칸 = 600, 줄 = { 0: ['M0 300H600'], 1: ['M300 0V600'], 2: ['M0 0L600 600'], 3: ['M0 600L600 0'], 4: ['M0 300H600', 'M300 0V600'], 5: ['M0 600L600 0', 'M0 0L600 600'] }[c.무늬.종류] || [];
+      Object.entries({ id: 무늬id, patternUnits: 'userSpaceOnUse', width: 칸, height: 칸 }).forEach(([k, x]) => pat.setAttribute(k, x));
+      if (c.채움) { const 밑 = document.createElementNS(NS, 'rect'); 밑.setAttribute('width', 칸); 밑.setAttribute('height', 칸); 밑.setAttribute('fill', c.채움); pat.append(밑); }
+      for (const d of 줄) { const l = document.createElementNS(NS, 'path'); l.setAttribute('d', d); l.setAttribute('stroke', c.무늬.색); l.setAttribute('stroke-width', 40); pat.append(l); }
+      svg.append(pat);
+    }
+    const e = 도형모양(c, 무늬id); if (!e) continue;
+    e.setAttribute('transform', `matrix(${c.M[0]} ${c.M[3]} ${c.M[1]} ${c.M[4]} ${c.M[2]} ${c.M[5]})`);
+    svg.append(e);
+  }
+  return svg.querySelector(':scope > :not(pattern)') ? svg : null;
+}
+let 도형무늬수 = 0;
 
 문서.hwp = async function (buf, 덧) {
   const u8 = new Uint8Array(buf);
@@ -234,7 +301,7 @@ function 개체요소읽기(몸, 맨위) {                           // 맨 위 
           const r = rs[i];
           if (r.태그 === 태그.개체요소) {
             const 요 = 개체요소읽기(r.몸, r.깊이 === 깊이 + 1);
-            if (요) { const 위 = 주인(r.깊이); 조각들.push({ ...요, 깊이: r.깊이, M: 위 ? 행렬곱(위.M, 요.M) : [1, 0, 0, 0, 1, 0] }); }   // 맨 위(묶음 자신)는 기준 좌표
+            if (요) 조각들.push({ ...요, 깊이: r.깊이, M: 조각들.length ? 요.M : [1, 0, 0, 0, 1, 0] });   // 조각 행렬 = 제 좌표 → 맨 위 묶음 «지금 크기» 좌표 (부모 행렬이 이미 들어 있음 · 10-22 HWPX 로 확인 — 전엔 부모를 또 곱하고 처음 크기 판에 놓아 어긋남)
             i++; continue;
           }
           if (r.태그 === 태그.목록머리) {
@@ -242,6 +309,7 @@ function 개체요소읽기(몸, 맨위) {                           // 맨 위 
             if (조 && 조.깊이 > 깊이 + 1) { 조.상자 = 만들기('div', '글상자'); i++; 문단들(조.상자, d, 수); continue; }   // 묶음 안 글상자 — 제 조각에
             i++; 문단들(상자, d, 수); continue;
           }
+          if (r.태그 >= 78 && r.태그 <= 83 && r.태그 !== 태그.OLE) { const 조 = 주인(r.깊이); if (조 && !조.몸) 조.몸 = r.몸; i++; continue; }   // 선 · 네모 · 타원 · 호 · 다각형 · 곡선 모양 (10-22)
           let 번호 = null;
           if (r.태그 === 태그.그림) 번호 = r.몸.length >= 73 ? 몸보기(r.몸).getUint16(71, true) : -1;   // 테두리 · 네 점 · 자르기 · 여백 · 밝기 · 명암 · 효과 뒤
           else if (r.태그 === 태그.OLE) 번호 = r.몸.length >= 14 ? 몸보기(r.몸).getUint16(12, true) : -1;
@@ -251,8 +319,10 @@ function 개체요소읽기(몸, 맨위) {                           // 맨 위 
         const 새그림 = 번호 => { const img = 만들기('img', '그림 채우는중'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; 할그림.push({ img, 번호 }); return img; };
         // 묶음($con) — 조각을 제자리에 겹쳐 놓음 (10-07) · 묶음 크기 비율의 칸 안에 백분율로 · 글상자 글씨는 묶음 너비 따라 (cqw)
         if (조각들[0]?.이름 === '$con' && 조각들[0].w0 > 0 && 조각들[0].h0 > 0) {
-          const W = 조각들[0].w0, H = 조각들[0].h0, 잎 = 조각들.slice(1).filter(c => c.그림 != null || c.상자?.textContent.trim());
-          if (잎.length) {
+          const W = 조각들[0].w1 || 조각들[0].w0, H = 조각들[0].h1 || 조각들[0].h0, 잎 = 조각들.slice(1).filter(c => c.그림 != null || c.상자?.textContent.trim());
+          const 그린 = 조각들.slice(1).filter(c => 그린도형.has(c.이름) && c.그림 == null);
+          const 판 = 그린.length ? 도형판(그린, W, H, '묶음도형') : null;   // 선 · 테두리 · 타원 (10-22 · 전엔 글 없는 도형은 안 그림)
+          if (잎.length || 판) {
             const mv = 머리.length >= 24 ? 몸보기(머리) : null;
             const 너비px = mv ? Math.round(mv.getUint32(16, true) / 75) : Math.round(W / 75);
             const 틀 = 만들기('div', '묶음그림');
@@ -268,11 +338,26 @@ function 개체요소읽기(몸, 맨위) {                           // 맨 위 
               if (c.상자?.textContent.trim()) { 칸.classList.add('묶음글'); 칸.append(c.상자); }
               틀.append(칸);
             }
+            if (판) 틀.append(판);                          // 선 · 화살표는 그림 위에
             if (상자.textContent.trim()) { const 감 = 만들기('div', '그림틀'); 감.append(틀, 상자); return { el: 감 }; }   // 묶음 캡션
             return { el: 틀 };
           }
         }
         const 글있음 = !!상자.textContent.trim();
+        const 하나 = 조각들.length === 1 && 그린도형.has(조각들[0].이름) ? 조각들[0] : null;   // 그린 도형 하나 (10-22)
+        if (!그림들.length && 하나 && 글있음) {           // 글상자 — 선 · 면 색을 상자에
+          if (하나.선) { 상자.style.border = `${Math.max(1, 하나.선.굵기 / 75).toFixed(1)}px ${하나.선.종류 > 1 ? 'dashed' : 'solid'} ${하나.선.색}`; 상자.classList.add('테두리'); }
+          if (하나.채움) 상자.style.background = 하나.채움;
+          if (하나.이름 === '$ell') 상자.style.borderRadius = '50%';
+        }
+        if (!그림들.length && 하나 && !글있음 && 하나.w0 > 0 && 하나.h0 > 0) {
+          const 판 = 도형판([{ ...하나, M: [1, 0, 0, 0, 1, 0] }], 하나.w0, 하나.h0, '도형하나'); if (!판) return null;
+          const mv = 머리.length >= 24 ? 몸보기(머리) : null;
+          const 너비 = mv ? Math.round(mv.getUint32(16, true) / 75) : Math.round(하나.w0 / 75), 높이 = mv ? Math.round(mv.getUint32(20, true) / 75) : Math.round(하나.h0 / 75);
+          판.style.width = Math.max(1, 너비) + 'px'; 판.style.aspectRatio = `${Math.max(1, 너비)} / ${Math.max(1, 높이)}`;
+          if (mv && (mv.getUint32(4, true) & 1)) return { el: 판, 인라인: true };
+          const 틀 = 만들기('div', '그림틀'); 틀.append(판); return { el: 틀 };
+        }
         if (!그림들.length) return 글있음 ? { el: 상자 } : null;
         if (그림들.length > 1 || 글있음) {              // 묶음 아닌 여러 장 · 그림 + 캡션 — 차례로 늘어놓음
           const 틀 = 만들기('div', '그림틀');

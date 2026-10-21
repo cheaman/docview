@@ -10,7 +10,8 @@
 //   ⑧ PPT길 — app.js 의 PDF 길과 같은 꼴 { 정보, 쪽, 찾기, 놓기 } → PDF 와 같은 화면 (펜 · 돌리기 · 쪽 목록 · 보내기)
 //   ⑨ 글로 (나) — 문서.pptx (docs.js 꼴) · 장마다 제목 · 글 · 그림 · 표 · 발표자 메모
 //   ⑩ 옛 PPT — 문서.ppt · 복합 문서(cfb.js) 안 「PowerPoint Document」 의 글 조각만
-// 못 그리는 것 : TIFF · 차트 · 스마트아트 → 회색 칸 · 애니메이션 · 동영상 · 그림자 (EMF · WMF 는 0.9.6 부터 meta.js 로 그림)
+// 차트 (10-22) : 막대 · 가로 막대 · 꺾은선 · 영역 · 원 · 도넛 → 캔버스 · 글로 보기는 표 (값은 차트 XML 의 캐시 값)
+// 못 그리는 것 : TIFF · 그 밖 차트 · 스마트아트 → 회색 칸 · 애니메이션 · 동영상 · 그림자 (EMF · WMF 는 0.9.6 부터 meta.js 로 그림)
 'use strict';
 const 피피티 = (() => {
   const EMU = 12700;                                   // 1pt
@@ -523,6 +524,134 @@ const 피피티 = (() => {
     const l = 수(자름, 'l') / 100000, t = 수(자름, 't') / 100000, r = 수(자름, 'r') / 100000, b = 수(자름, 'b') / 100000;
     try { ctx.drawImage(그.im, iw * l, ih * t, Math.max(1, iw * (1 - l - r)), Math.max(1, ih * (1 - t - b)), x, y, w, h); } catch (e) { 빈칸(ctx, x, y, w, h, '그림'); }
   }
+  // 차트 (10-22) — c:chart r:id → ppt/charts/chartN.xml · 첫 그림 꼴 하나만 (막대 · 꺾은선 · 영역 · 원)
+  async function 차트읽기(문, 준, p) {
+    const t = p ? await 문.z.글(p).catch(() => null) : null; if (!t) return null;
+    const d = 엑(t).documentElement, 판 = 아래(d, 'plotArea'); if (!판) return null;
+    const 꼴들 = ['barChart', 'bar3DChart', 'lineChart', 'line3DChart', 'areaChart', 'area3DChart', 'pieChart', 'pie3DChart', 'doughnutChart'];
+    const 그 = [...판.children].find(c => 꼴들.includes(c.localName)); if (!그) return null;
+    const 값들 = e => { const c = 아래(e, 'numCache') || 아래(e, 'strCache') || 아래(e, 'numLit') || 아래(e, 'strLit'); if (!c) return [];
+      const n = +(속(아래(c, 'ptCount'), 'val') || 0), a = Array(n).fill(null);
+      for (const pt of 아이들(c, 'pt')) a[+속(pt, 'idx')] = 아이(pt, 'v')?.textContent ?? null; return a; };
+    const 색 = e => { const f = 아이(아이(e, 'spPr'), 'solidFill'), c = f?.firstElementChild; if (!c) return null;
+      if (c.localName === 'srgbClr') return '#' + 속(c, 'val'); if (c.localName === 'schemeClr') { const v = 준.색표(속(c, 'val')); return v ? '#' + v : null; } return null; };
+    const 계열 = 아이들(그, 'ser').map((e, k) => ({
+      이름: (아래(아이(e, 'tx'), 'v')?.textContent || 아래(아이(e, 'tx'), 't')?.textContent || `계열 ${k + 1}`),
+      범주: 값들(아이(e, 'cat')), 값: 값들(아이(e, 'val')).map(v => (v == null || v === '' ? null : +v)),
+      색: 색(e) || '#' + (준.색표('accent' + (k % 6 + 1)) || ['4472C4', 'ED7D31', 'A5A5A5', 'FFC000', '5B9BD5', '70AD47'][k % 6]),
+      점색: 아이들(e, 'dPt').map(dp => ({ i: +속(아이(dp, 'idx'), 'val'), 색: 색(dp) })).filter(x => x.색),
+    }));
+    if (!계열.length) return null;
+    const 범주 = 계열.find(x => x.범주.length)?.범주 || 계열[0].값.map((_, i) => String(i + 1));
+    const 이름 = 그.localName.replace(/3D/, '');
+    const 제목 = [...(아래(아래(d, 'title'), 'rich')?.getElementsByTagNameNS('*', 't') || [])].map(x => x.textContent).join('');
+    return { 꼴: /bar/.test(이름) ? '막대' : /line/.test(이름) ? '꺾은선' : /area/.test(이름) ? '영역' : '원', 도넛: 이름 === 'doughnutChart',
+      가로: 속(아이(그, 'barDir'), 'val') === 'bar', 쌓기: /stacked/i.test(속(아이(그, 'grouping'), 'val') || ''), 백분: 속(아이(그, 'grouping'), 'val') === 'percentStacked',
+      값보임: 속(아래(그, 'showVal'), 'val') === '1', 범주, 계열, 제목 };
+  }
+  const 차트수 = v => (v == null || !isFinite(v) ? '' : Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('ko-KR') : String(+v.toFixed(2)));
+  function 눈금(최소, 최대) {                                   // 보기 좋은 눈금 (1 · 2 · 5 × 10ⁿ) 대여섯 칸
+    if (최대 === 최소) 최대 = 최소 + 1;
+    const 거칠 = (최대 - 최소) / 5, 자 = Math.pow(10, Math.floor(Math.log10(거칠))), 칸 = [1, 2, 5, 10].map(m => m * 자).find(c => c >= 거칠) || 거칠;
+    return { 아래: Math.floor(최소 / 칸) * 칸, 위: Math.ceil(최대 / 칸) * 칸, 칸 };
+  }
+  function 차트그리기(ctx, 차, x, y, w, h) {
+    ctx.save();
+    const px = Math.max(8, Math.min(16, Math.min(w, h) / 16)), 글 = n => `${n}px ${기본글꼴}`;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, w, h);
+    let 위 = y + px * 0.6, 아래끝 = y + h - px * 0.6;
+    ctx.textBaseline = 'middle';
+    if (차.제목) { ctx.font = `700 ${글(px * 1.15)}`; ctx.fillStyle = '#262626'; ctx.textAlign = 'center'; ctx.fillText(차.제목, x + w / 2, 위 + px * 0.6, w - 8); 위 += px * 1.8; }
+    // 범례 (아래 한 줄) — 원은 범주 · 그 밖은 계열
+    const 범례 = 차.꼴 === '원' ? 차.범주.map((c, i) => ({ 이름: c ?? '', 색: 원색(차, i) })) : 차.계열.map(s => ({ 이름: s.이름, 색: s.색 }));
+    ctx.font = 글(px);
+    const 폭들 = 범례.map(b => ctx.measureText(b.이름).width + px * 1.6), 합 = 폭들.reduce((a, b) => a + b, 0);
+    let bx = x + Math.max(4, (w - 합) / 2); const by = 아래끝 - px * 0.5;
+    범례.forEach((b, i) => { ctx.fillStyle = b.색; ctx.fillRect(bx, by - px * 0.35, px * 0.7, px * 0.7); ctx.fillStyle = '#404040'; ctx.textAlign = 'left'; ctx.fillText(b.이름, bx + px * 0.95, by, 폭들[i]); bx += 폭들[i]; });
+    아래끝 -= px * 1.6;
+    if (차.꼴 === '원') {
+      const 값 = 차.계열[0].값.map(v => Math.max(0, v || 0)), 합계 = 값.reduce((a, b) => a + b, 0) || 1;
+      const r = Math.max(4, Math.min(w, 아래끝 - 위) / 2 - px * 0.5), cx = x + w / 2, cy = (위 + 아래끝) / 2;
+      let a = -Math.PI / 2;
+      값.forEach((v, i) => {
+        const b = a + v / 합계 * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, a, b); ctx.closePath(); ctx.fillStyle = 원색(차, i); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+        if (v / 합계 > 0.04) { const m = (a + b) / 2; ctx.fillStyle = '#fff'; ctx.font = `700 ${글(px)}`; ctx.textAlign = 'center'; ctx.fillText(차.값보임 ? 차트수(v) : Math.round(v / 합계 * 100) + '%', cx + Math.cos(m) * r * 0.65, cy + Math.sin(m) * r * 0.65); }
+        a = b;
+      });
+      if (차.도넛) { ctx.beginPath(); ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill(); }
+      ctx.restore(); return;
+    }
+    // 축 차트 — 값 범위
+    const n = 차.범주.length, 수들 = [];
+    for (let i = 0; i < n; i++) {
+      if (차.쌓기) { let 양 = 0, 음 = 0; 차.계열.forEach(s => { const v = s.값[i] || 0; v >= 0 ? (양 += v) : (음 += v); }); 수들.push(양, 음); }
+      else 차.계열.forEach(s => { if (s.값[i] != null) 수들.push(s.값[i]); });
+    }
+    const 눈 = 차.백분 ? { 아래: 0, 위: 100, 칸: 20 } : 눈금(Math.min(0, ...수들), Math.max(0, ...수들));
+    ctx.font = 글(px * 0.9);
+    const 눈글 = []; for (let v = 눈.아래; v <= 눈.위 + 눈.칸 * 1e-6; v += 눈.칸) 눈글.push(+v.toFixed(10));
+    const 왼폭 = Math.max(...눈글.map(v => ctx.measureText(차트수(v)).width)) + px * 0.8;
+    const 범주높 = px * 1.6;
+    const 판 = 차.가로 ? { x: x + Math.min(w * 0.35, Math.max(...차.범주.map(c => ctx.measureText(c ?? '').width)) + px), y: 위, w: 0, h: 0 } : { x: x + 왼폭, y: 위 + px * 0.5, w: 0, h: 0 };
+    판.w = x + w - px * 0.8 - 판.x; 판.h = (차.가로 ? 아래끝 - 범주높 : 아래끝 - 범주높) - 판.y;
+    if (판.w < 10 || 판.h < 10) { ctx.restore(); return; }
+    const 값자리 = v => 차.가로 ? 판.x + (v - 눈.아래) / (눈.위 - 눈.아래) * 판.w : 판.y + 판.h - (v - 눈.아래) / (눈.위 - 눈.아래) * 판.h;
+    // 눈금선 · 값 글
+    ctx.strokeStyle = '#d9d9d9'; ctx.lineWidth = 1; ctx.fillStyle = '#595959';
+    for (const v of 눈글) {
+      const q = 값자리(v); ctx.beginPath();
+      if (차.가로) { ctx.moveTo(q, 판.y); ctx.lineTo(q, 판.y + 판.h); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(차트수(v), q, 판.y + 판.h + px * 0.8); }
+      else { ctx.moveTo(판.x, q); ctx.lineTo(판.x + 판.w, q); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(차트수(v), 판.x - px * 0.4, q); }
+    }
+    // 범주 글
+    const 띠 = (차.가로 ? 판.h : 판.w) / Math.max(1, n);
+    ctx.fillStyle = '#404040'; ctx.font = 글(px * 0.95);
+    차.범주.forEach((c, i) => {
+      const 가운데 = (차.가로 ? 판.y : 판.x) + 띠 * (i + 0.5);
+      if (차.가로) { ctx.textAlign = 'right'; ctx.fillText(c ?? '', 판.x - px * 0.4, 가운데, 판.x - x - px * 0.5); }
+      else { ctx.textAlign = 'center'; ctx.fillText(c ?? '', 가운데, 판.y + 판.h + px * 0.9, 띠 - 2); }
+    });
+    const 영 = 값자리(Math.max(눈.아래, Math.min(눈.위, 0)));
+    if (차.꼴 === '막대') {
+      const 묶음폭 = 띠 * 0.7, 하나 = 차.쌓기 ? 묶음폭 : 묶음폭 / 차.계열.length;
+      for (let i = 0; i < n; i++) {
+        let 양 = 0, 음 = 0; const 합 = 차.백분 ? 차.계열.reduce((a, s) => a + Math.abs(s.값[i] || 0), 0) || 1 : 1;
+        차.계열.forEach((s, k) => {
+          let v = s.값[i]; if (v == null) return; if (차.백분) v = v / 합 * 100;
+          const 시작 = 차.쌓기 ? (v >= 0 ? 양 : 음) : 0, 끝 = 시작 + v; if (차.쌓기) v >= 0 ? (양 = 끝) : (음 = 끝);
+          const 자리 = (차.가로 ? 판.y : 판.x) + 띠 * i + (띠 - 묶음폭) / 2 + (차.쌓기 ? 0 : 하나 * k);
+          const a = 값자리(시작), b = 값자리(끝);
+          ctx.fillStyle = s.점색.find(p => p.i === i)?.색 || s.색;
+          if (차.가로) ctx.fillRect(Math.min(a, b), 자리, Math.abs(b - a), 하나 * 0.92); else ctx.fillRect(자리, Math.min(a, b), 하나 * 0.92, Math.abs(b - a));
+          if (차.값보임 || !차.쌓기) {                             // 값 글 — 폰에서 읽히게 늘 (쌓기는 값보임일 때만)
+            ctx.fillStyle = '#262626'; ctx.font = 글(Math.min(px * 0.85, 하나 * 0.6)); ctx.textAlign = 'center';
+            if (차.가로) { ctx.textAlign = 'left'; ctx.fillText(차트수(s.값[i]), Math.max(a, b) + 3, 자리 + 하나 * 0.46); }
+            else ctx.fillText(차트수(s.값[i]), 자리 + 하나 * 0.46, Math.min(a, b) - px * 0.55);
+          }
+        });
+      }
+    } else {                                                          // 꺾은선 · 영역
+      차.계열.forEach(s => {
+        const 점 = s.값.map((v, i) => v == null ? null : [판.x + 띠 * (i + 0.5), 값자리(v)]).filter(Boolean); if (!점.length) return;
+        ctx.beginPath(); 점.forEach(([px2, py], k) => (k ? ctx.lineTo(px2, py) : ctx.moveTo(px2, py)));
+        if (차.꼴 === '영역') { ctx.lineTo(점.at(-1)[0], 영); ctx.lineTo(점[0][0], 영); ctx.closePath(); ctx.globalAlpha = 0.55; ctx.fillStyle = s.색; ctx.fill(); ctx.globalAlpha = 1; }
+        else { ctx.strokeStyle = s.색; ctx.lineWidth = Math.max(1.5, px / 6); ctx.stroke(); ctx.fillStyle = s.색; 점.forEach(([px2, py]) => { ctx.beginPath(); ctx.arc(px2, py, Math.max(2, px / 5), 0, Math.PI * 2); ctx.fill(); }); }
+        if (차.값보임) { ctx.fillStyle = '#262626'; ctx.font = 글(px * 0.85); ctx.textAlign = 'center'; s.값.forEach((v, i) => v != null && ctx.fillText(차트수(v), 판.x + 띠 * (i + 0.5), 값자리(v) - px * 0.7)); }
+      });
+    }
+    ctx.strokeStyle = '#8c8c8c'; ctx.lineWidth = 1; ctx.beginPath();          // 0 축
+    if (차.가로) { ctx.moveTo(영, 판.y); ctx.lineTo(영, 판.y + 판.h); } else { ctx.moveTo(판.x, 영); ctx.lineTo(판.x + 판.w, 영); }
+    ctx.stroke();
+    ctx.restore();
+  }
+  function 원색(차, i) { const s = 차.계열[0]; return s.점색.find(p => p.i === i)?.색 || ['#4472C4', '#ED7D31', '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47', '#264478', '#9E480E'][i % 8]; }
+  function 차트표(차) {                                           // 글로 보기 — 범주 × 계열 표
+    const t = 만('table'), 머 = 만('tr');
+    머.append(만('th', null, ''), ...차.계열.map(s => 만('th', null, s.이름))); t.append(머);
+    차.범주.forEach((c, i) => { const 줄 = 만('tr'); 줄.append(만('td', null, c ?? ''), ...차.계열.map(s => 만('td', '수', 차트수(s.값[i])))); t.append(줄); });
+    return t;
+  }
   function 빈칸(ctx, x, y, w, h, 말) {
     ctx.save();
     ctx.fillStyle = 'rgba(160,170,185,0.18)'; ctx.fillRect(x, y, w, h);
@@ -663,7 +792,11 @@ const 피피티 = (() => {
       else {
         const blip = 아래(gd, 'blip');
         if (blip) 그림놓기(ctx, await 그림얻기(문, 부.r.get(blip.getAttributeNS(R, 'embed'))?.길), -w / 2, -h / 2, w, h, null);
-        else 빈칸(ctx, -w / 2, -h / 2, w, h, /chart/.test(uri) ? '차트' : /diagram/.test(uri) ? '스마트아트' : '개체');
+        else {
+          const 차 = /chart/.test(uri) ? await 차트읽기(문, 준, 부.r.get(속(아이(gd, 'chart'), 'r:id') || 아이(gd, 'chart')?.getAttributeNS(R, 'id'))?.길).catch(() => null) : null;
+          if (차) 차트그리기(ctx, 차, -w / 2, -h / 2, w, h);
+          else 빈칸(ctx, -w / 2, -h / 2, w, h, /chart/.test(uri) ? '차트' : /diagram/.test(uri) ? '스마트아트' : '개체');
+        }
       }
       ctx.restore(); return;
     }
@@ -860,7 +993,11 @@ const 피피티 = (() => {
               t.append(줄);
             }
             표틀.append(t); 틀.append(표틀);
-          } else 틀.append(만('p', '빈그림', /chart/.test(속(길(e, 'graphic', 'graphicData'), 'uri') || '') ? '[차트]' : '[개체]'));
+          } else {
+            const gd = 길(e, 'graphic', 'graphicData'), 차 = /chart/.test(속(gd, 'uri') || '') ? await 차트읽기(문, 준, 준.s.r.get(속(아이(gd, 'chart'), 'r:id') || 아이(gd, 'chart')?.getAttributeNS(R, 'id'))?.길).catch(() => null) : null;
+            if (차) { const 표틀 = 만('div', '표틀'); if (차.제목) 틀.append(만('p', null, '📊 ' + 차.제목)); else 틀.append(만('p', '빈그림', '📊 차트')); 표틀.append(차트표(차)); 틀.append(표틀); }
+            else 틀.append(만('p', '빈그림', /chart/.test(속(gd, 'uri') || '') ? '[차트]' : '[개체]'));
+          }
           continue;
         }
         const tb = 아이(e, 'txBody'); if (!tb) continue;

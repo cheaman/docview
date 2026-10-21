@@ -187,6 +187,68 @@ const 크기em = (pt, 기본) => Math.min(1.8, Math.max(0.7, pt / 기본)).toFix
     if (!u) { 그림없음++; return 만들기('span', '빈그림', '[그림]'); }
     const e = 만들기('img', '그림'); e.src = u; e.alt = ''; return e;
   }
+  // 그린 도형 (10-22) — hwpdoc.js 의 도형판 · 행렬곱 을 같이 씀 · 조각 행렬(renderingInfo) = 제 좌표 → 맨 위 묶음 지금 크기(curSz) 좌표
+  const 이름표 = { line: '$lin', rect: '$rec', ellipse: '$ell', polygon: '$pol', curve: '$cur', arc: '$arc' };
+  const 수 = (e, a) => +(e?.getAttribute(a) || 0);
+  function 도형조각(e) {
+    const org = 자식(e, 'orgSz'), ri = 자식(e, 'renderingInfo');
+    let M = [1, 0, 0, 0, 1, 0];
+    if (ri) for (const m of ri.children) M = 행렬곱(M, [1, 2, 3, 4, 5, 6].map(k => 수(m, 'e' + k)));
+    const 선모 = 자식(e, 'lineShape'), 선꼴 = 선모?.getAttribute('style') || 'NONE', 선색 = (선모?.getAttribute('color') || '#000000').toLowerCase();
+    const 선 = 선모 && 선꼴 !== 'NONE' ? { 색: 선색 === '#000000' ? 'rgb(0,0,0)' : 선색, 굵기: 수(선모, 'width'), 종류: 선꼴 === 'SOLID' ? 1 : /DOT/.test(선꼴) && !/DASH/.test(선꼴) ? 3 : 2 } : null;
+    const wb = 자식(자식(e, 'fillBrush'), 'winBrush'), 면 = wb?.getAttribute('faceColor') || 'none';
+    const 채움 = 면 !== 'none' && 면.toUpperCase() !== '#FFFFFF' ? 면 : null;
+    const 무늬종류 = { HORIZONTAL: 0, VERTICAL: 1, SLASH: 2, BACK_SLASH: 3, CROSS: 4, CROSS_DIAGONAL: 5 }[wb?.getAttribute('hatchStyle')];
+    const 무늬 = 무늬종류 != null ? { 색: wb.getAttribute('hatchColor') || '#000000', 종류: 무늬종류 } : null;
+    const 시 = 자식(e, 'startPt'), 끝점 = 자식(e, 'endPt');
+    let 점 = 자식들(e, 'pt').map(p => [수(p, 'x'), 수(p, 'y')]);
+    if (!점.length) { const 마디 = 자식들(e, 'seg'); 점 = 마디.map(g => [수(g, 'x1'), 수(g, 'y1')]); if (마디.length) 점.push([수(마디.at(-1), 'x2'), 수(마디.at(-1), 'y2')]); }
+    return { 이름: 이름표[e.localName], w0: 수(org, 'width'), h0: 수(org, 'height'), M, 선, 채움, 무늬,
+      끝: 시 && 끝점 ? [수(시, 'x'), 수(시, 'y'), 수(끝점, 'x'), 수(끝점, 'y')] : null, 점: 점.length ? 점 : null, 곡률: 수(e, 'ratio') };
+  }
+  const 글상자읽기 = async e => { const 상자 = 만들기('div', '글상자'); for (const sl of 후손(e, 'subList')) for (const pp of 자식들(sl, 'p')) await 문단(pp, 상자); return 상자; };
+  async function 도형(c) {
+    const k = c.localName, sz = 자식(c, 'sz'), 너비 = Math.round(수(sz, 'width') / 75), 높이 = Math.round(수(sz, 'height') / 75);
+    const 글자처럼 = 자식(c, 'pos')?.getAttribute('treatAsChar') === '1';
+    if (k === 'container') {                         // 묶음 — 그림 · 글상자는 제자리 칸 · 선 · 테두리는 SVG 한 판 (그림 위)
+      const cur = 자식(c, 'curSz'), W = 수(cur, 'width') || 수(자식(c, 'orgSz'), 'width'), H = 수(cur, 'height') || 수(자식(c, 'orgSz'), 'height');
+      if (!(W > 0 && H > 0)) return null;
+      const 잎 = [], 걷기 = e => { for (const ch of e.children) { if (ch.localName === 'container') 걷기(ch); else if (ch.localName === 'pic' || 이름표[ch.localName]) 잎.push(ch); } };
+      걷기(c);
+      const 틀 = 만들기('div', '묶음그림');
+      틀.style.aspectRatio = `${W} / ${H}`; if (너비 > 0 && 너비 < 5000) 틀.style.maxWidth = 너비 + 'px';
+      틀.style.setProperty('--묶음글', (13.33 / (W / 75) * 100).toFixed(3) + 'cqw');
+      const 그린 = [];
+      for (const e of 잎) {
+        const 조 = 도형조각(e); if (조.이름) 그린.push(조);
+        const 상자 = e.localName === 'pic' ? null : await 글상자읽기(e);
+        if (e.localName !== 'pic' && !상자.textContent.trim()) continue;
+        const 점 = [[0, 0], [조.w0, 0], [0, 조.h0], [조.w0, 조.h0]].map(([x, y]) => [조.M[0] * x + 조.M[1] * y + 조.M[2], 조.M[3] * x + 조.M[4] * y + 조.M[5]]);
+        const x0 = Math.min(...점.map(p => p[0])), x1 = Math.max(...점.map(p => p[0])), y0 = Math.min(...점.map(p => p[1])), y1 = Math.max(...점.map(p => p[1]));
+        if (!(x1 > x0 && y1 > y0)) continue;
+        const 칸 = 만들기('div', '묶음조각');
+        Object.assign(칸.style, { left: (x0 / W * 100).toFixed(3) + '%', top: (y0 / H * 100).toFixed(3) + '%', width: ((x1 - x0) / W * 100).toFixed(3) + '%', height: ((y1 - y0) / H * 100).toFixed(3) + '%' });
+        if (e.localName === 'pic') 칸.append(await 그림(e)); else { 칸.classList.add('묶음글'); 칸.append(상자); }
+        틀.append(칸);
+      }
+      const 판 = 그린.length ? 도형판(그린, W, H, '묶음도형') : null; if (판) 틀.append(판);
+      return 틀.children.length ? { el: 틀 } : null;
+    }
+    const 상자 = await 글상자읽기(c), 글있음 = !!상자.textContent.trim();
+    const 조 = 이름표[k] ? 도형조각(c) : null;
+    if (조 && 글있음) {                               // 글상자 — 선 · 면 색을 상자에
+      if (조.선) { 상자.style.border = `${Math.max(1, 조.선.굵기 / 75).toFixed(1)}px ${조.선.종류 > 1 ? 'dashed' : 'solid'} ${조.선.색}`; 상자.classList.add('테두리'); }
+      if (조.채움) 상자.style.background = 조.채움;
+      if (k === 'ellipse') 상자.style.borderRadius = '50%';
+    }
+    if (글있음) return { el: 상자 };
+    if (!조 || !(조.w0 > 0 && 조.h0 > 0)) return null;
+    const 판 = 도형판([{ ...조, M: [1, 0, 0, 0, 1, 0] }], 조.w0, 조.h0, '도형하나'); if (!판) return null;
+    const w = Math.max(1, 너비 || Math.round(조.w0 / 75)), h = Math.max(1, 높이 || Math.round(조.h0 / 75));
+    판.style.width = w + 'px'; 판.style.aspectRatio = `${w} / ${h}`;
+    if (글자처럼) return { el: 판, 인라인: true };
+    const 틀 = 만들기('div', '그림틀'); 틀.append(판); return { el: 틀 };
+  }
   function 글자(t, span) {               // hp:t 안 — 글 · 줄바꿈 · 탭 이 섞여 있음 (줄바꿈 뒤 글은 꼬리 글)
     for (const n of t.childNodes) {
       if (n.nodeType === 3) span.append(n.nodeValue);
@@ -224,10 +286,9 @@ const 크기em = (pt, 기본) => Math.min(1.8, Math.max(0.7, pt / 기본)).toFix
           글자(c, span); el.append(span);
         } else if (k === 'tbl') { 담을곳.append(await 표(c)); 덩이뒤 = true; }
         else if (k === 'pic') { el.append(await 그림(c)); }
-        else if (['rect', 'ellipse', 'polygon', 'container', 'drawText', 'textart'].includes(k)) {
-          const 상자 = 만들기('div', '글상자');
-          for (const sl of 후손(c, 'subList')) for (const pp of 자식들(sl, 'p')) await 문단(pp, 상자);
-          if (상자.textContent.trim()) { 담을곳.append(상자); 덩이뒤 = true; }
+        else if (['rect', 'ellipse', 'polygon', 'container', 'drawText', 'textart', 'line', 'curve', 'arc'].includes(k)) {
+          const r = await 도형(c);                     // 선 · 테두리 · 타원 · 묶음 (10-22 · 전엔 글만)
+          if (r?.인라인) el.append(r.el); else if (r) { 담을곳.append(r.el); 덩이뒤 = true; }
         } else if (k === 'equation') el.append(만들기('span', '빈그림', '[수식]'));
       }
     }
